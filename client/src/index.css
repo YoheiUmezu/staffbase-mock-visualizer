@@ -119,6 +119,7 @@
   }
   body {
     @apply bg-background text-foreground;
+    font-family: 'Inter', 'Segoe UI', system-ui, -apple-system, sans-serif;
   }
   button:not(:disabled),
   [role="button"]:not([aria-disabled="true"]),
@@ -131,6 +132,39 @@
   input[type="radio"]:not(:disabled) {
     @apply cursor-pointer;
   }
+}
+
+/* ─── Custom scrollbar ─────────────────────────────────────────────────────── */
+::-webkit-scrollbar { width: 6px; height: 6px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: oklch(0.80 0.01 240); border-radius: 999px; }
+::-webkit-scrollbar-thumb:hover { background: oklch(0.65 0.01 240); }
+
+/* ─── Animations ────────────────────────────────────────────────────────────── */
+@keyframes shimmer {
+  0% { background-position: -200% 0; }
+  100% { background-position: 200% 0; }
+}
+.shimmer {
+  background: linear-gradient(90deg, oklch(0.93 0.005 240) 25%, oklch(0.97 0.002 240) 50%, oklch(0.93 0.005 240) 75%);
+  background-size: 200% 100%;
+  animation: shimmer 1.6s ease-in-out infinite;
+}
+@keyframes fadeInUp {
+  from { opacity: 0; transform: translateY(20px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+.fade-in-up { animation: fadeInUp 0.55s cubic-bezier(0.16,1,0.3,1) forwards; }
+.fade-in-up-1 { animation: fadeInUp 0.55s cubic-bezier(0.16,1,0.3,1) 0.05s both; }
+.fade-in-up-2 { animation: fadeInUp 0.55s cubic-bezier(0.16,1,0.3,1) 0.15s both; }
+.fade-in-up-3 { animation: fadeInUp 0.55s cubic-bezier(0.16,1,0.3,1) 0.25s both; }
+
+/* ─── Glass ─────────────────────────────────────────────────────────────────── */
+.glass {
+  background: rgba(255,255,255,0.72);
+  backdrop-filter: blur(14px);
+  -webkit-backdrop-filter: blur(14px);
+  border: 1px solid rgba(255,255,255,0.55);
 }
 
 @layer components {
