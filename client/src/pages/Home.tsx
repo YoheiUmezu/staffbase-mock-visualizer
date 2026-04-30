@@ -96,7 +96,7 @@ function ColorSwatches({ brand }: { brand: BrandData }) {
 
 function SkeletonFrame({ isDesktop }: { isDesktop: boolean }) {
   return (
-    <div className={`rounded-2xl overflow-hidden border border-border/60 shadow-sm ${isDesktop ? "aspect-[16/10]" : "aspect-[9/19.5] max-w-[260px] mx-auto"}`}>
+    <div className={`rounded-2xl overflow-hidden border border-border/60 shadow-sm ${isDesktop ? "aspect-[16/10]" : "aspect-[9/19.5] max-w-[390px] mx-auto"}`}>
       <div className="w-full h-full shimmer" />
     </div>
   );
@@ -126,7 +126,7 @@ function DesktopFrame({ children }: { children: React.ReactNode }) {
 
 function MobileFrame({ children }: { children: React.ReactNode }) {
   return (
-    <div className="rounded-[2.5rem] overflow-hidden border-4 border-zinc-800 shadow-2xl bg-zinc-800 mx-auto" style={{ maxWidth: 280 }}>
+    <div className="rounded-[2.5rem] overflow-hidden border-4 border-zinc-800 shadow-2xl bg-zinc-800 mx-auto" style={{ maxWidth: 390 }}>
       {/* Notch */}
       <div className="h-7 bg-zinc-900 flex items-center justify-center">
         <div className="w-20 h-4 rounded-full bg-zinc-800" />
@@ -166,7 +166,7 @@ function PreviewPanel({
   }, [html]);
 
   const isDesktop = label === "Desktop";
-  const effectiveContainer = isDesktop ? containerWidth : Math.min(containerWidth, 280);
+  const effectiveContainer = isDesktop ? containerWidth : Math.min(containerWidth, 390);
   const scale = effectiveContainer / viewportWidth;
   const scaledHeight = isDesktop
     ? Math.round(viewportWidth * 0.625)
@@ -240,7 +240,7 @@ export default function Home() {
   const desktopContainerRef = useRef<HTMLDivElement>(null);
   const mobileContainerRef = useRef<HTMLDivElement>(null);
   const [desktopWidth, setDesktopWidth] = useState(900);
-  const [mobileWidth, setMobileWidth] = useState(280);
+  const [mobileWidth, setMobileWidth] = useState(390);
 
   // Observe container widths
   useEffect(() => {
@@ -421,7 +421,7 @@ export default function Home() {
               {[
                 "Brand color extraction",
                 "Desktop preview (1280px)",
-                "Mobile preview (375px)",
+                "Mobile preview (390px)",
                 "CSS-only visuals",
                 "No external images",
                 "Regenerate anytime",
@@ -455,7 +455,7 @@ export default function Home() {
               </p>
             </div>
 
-            <div className="grid grid-cols-1 xl:grid-cols-[1fr_320px] gap-8 items-start">
+            <div className="grid grid-cols-1 xl:grid-cols-[1fr_420px] gap-8 items-start">
               <div>
                 <div className="flex items-center gap-2 text-sm font-semibold text-muted-foreground mb-3">
                   <Monitor className="w-4 h-4" /> Desktop <span className="font-normal text-xs">(1280px)</span>
@@ -464,7 +464,7 @@ export default function Home() {
               </div>
               <div>
                 <div className="flex items-center gap-2 text-sm font-semibold text-muted-foreground mb-3">
-                  <Smartphone className="w-4 h-4" /> Mobile <span className="font-normal text-xs">(375px)</span>
+                  <Smartphone className="w-4 h-4" /> Mobile <span className="font-normal text-xs">(390px)</span>
                 </div>
                 <SkeletonFrame isDesktop={false} />
               </div>
@@ -523,7 +523,7 @@ export default function Home() {
             </div>
 
             {/* Preview panels */}
-            <div className="grid grid-cols-1 xl:grid-cols-[1fr_320px] gap-8 items-start">
+            <div className="grid grid-cols-1 xl:grid-cols-[1fr_420px] gap-8 items-start">
               <div ref={desktopContainerRef} className="w-full min-w-0">
                 <PreviewPanel
                   html={mockHtml}
@@ -536,8 +536,8 @@ export default function Home() {
                 <PreviewPanel
                   html={mockHtml}
                   label="Mobile"
-                  viewportWidth={375}
-                  containerWidth={Math.min(mobileWidth, 280)}
+                  viewportWidth={390}
+                  containerWidth={Math.min(mobileWidth, 390)}
                 />
               </div>
             </div>

@@ -10,3 +10,8 @@
 - [x] Global CSS: refined typography, spacing, color palette
 - [x] Vitest: test brand extraction procedure
 - [x] Checkpoint and deliver
+
+## Bug Fixes (Round 2)
+- [x] Fix brand color extraction: fetch actual website HTML/CSS and pass to LLM for real color detection
+- [x] Fix mobile preview width to iPhone 13 actual CSS width (390px)
+- [x] Generate all mock UI text content in Japanese
