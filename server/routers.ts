@@ -298,7 +298,58 @@ Return ONLY valid JSON:
 
         return { html: cleaned };
       }),
+
+    // ── AI image prompt generation ─────────────────────────────────────────
+    generateImagePrompt: publicProcedure
+      .input(z.object({
+        companyName: z.string(),
+        websiteUrl: z.string(),
+        brandData: brandDataSchema,
+      }))
+      .mutation(async ({ input }) => {
+        const { companyName, websiteUrl, brandData } = input;
+        const promptInstruction = `あなたはAI画像生成プロンプトの専門家です。以下の企業情報をもとに、他のAIツール（Midjourney、DALL-E、Stable Diffusionなど）で高品質な企業イントラネットUI画像を生成するための、詳細で具体的な日本語プロンプトを作成してください。
+
+【企業情報】
+- 企業名: ${companyName}
+- 公式サイト: ${websiteUrl}
+- 業界: ${brandData.industry}
+- ブランドトーン: ${brandData.brandTone}
+- プライマリーカラー: ${brandData.primaryColor}
+- セカンダリーカラー: ${brandData.secondaryColor}
+- アクセントカラー: ${brandData.accentColor}
+- タグライン: ${brandData.tagline}
+
+以下の固定プロンプトに続けて使える、企業固有の追加指示を作成してください。
+
+固定プロンプト（先頭に付く）:
+---
+あなたは企業イントラネットUIデザインの専門家です。ユーザーから提供されるモック画像をベースに、本物の企業ロゴと適切な実写画像を組み込んで、完成度の高い企業イントラネット画像を作成します。
+---
+
+企業固有の追加指示として以下を含めてください:
+1. ${companyName}の公式ロゴの特徴（色、形状、フォントスタイル）
+2. ブランドカラーの具体的な使用指示（${brandData.primaryColor}をナビゲーションに、など）
+3. 業界（${brandData.industry}）に適したニュース画像・バナー画像の内容指示
+4. ヒーローバナーの背景画像の具体的な内容（業界・ブランドトーンに合わせて）
+5. 全体的なデザインの雰囲気・トーン指示
+
+出力形式: 日本語で、すぐにAIツールに貼り付けられる形式のプロンプトテキストのみを返してください。`;
+
+        const response = await invokeLLM({
+          messages: [
+            {
+              role: 'system',
+              content: 'あなたはAI画像生成プロンプトの専門家です。指示に従い、すぐに使えるプロンプトテキストのみを返してください。',
+            },
+            { role: 'user', content: promptInstruction },
+          ],
+        });
+        const rawContent = response.choices[0]?.message?.content;
+        const content = typeof rawContent === 'string' ? rawContent : '';
+        if (!content) throw new Error('No response from LLM');
+        return { prompt: content.trim() };
+      }),
   }),
 });
-
 export type AppRouter = typeof appRouter;

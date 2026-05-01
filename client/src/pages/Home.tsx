@@ -15,10 +15,12 @@ import {
   ChevronRight,
   Loader2,
   CheckCircle2,
+  Copy,
+  Check,
+  Wand2,
 } from "lucide-react";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
-
 interface BrandData {
   primaryColor: string;
   secondaryColor: string;
@@ -31,19 +33,16 @@ interface BrandData {
   brandTone: string;
   tagline: string;
 }
-
 type Step = "idle" | "extracting" | "generating" | "done" | "error";
 
 // ─── Step indicator ───────────────────────────────────────────────────────────
-
 function StepIndicator({ step }: { step: Step }) {
   const steps = [
-    { key: "extracting", label: "Brand analysis" },
-    { key: "generating", label: "Mock generation" },
-    { key: "done", label: "Complete" },
+    { key: "extracting", label: "ブランド解析" },
+    { key: "generating", label: "モック生成" },
+    { key: "done", label: "完了" },
   ];
   const currentIdx = steps.findIndex(s => s.key === step);
-
   return (
     <div className="flex items-center gap-1.5">
       {steps.map((s, i) => {
@@ -76,7 +75,6 @@ function StepIndicator({ step }: { step: Step }) {
 }
 
 // ─── Color swatch row ─────────────────────────────────────────────────────────
-
 function ColorSwatches({ brand }: { brand: BrandData }) {
   return (
     <div className="flex items-center gap-1">
@@ -93,17 +91,28 @@ function ColorSwatches({ brand }: { brand: BrandData }) {
 }
 
 // ─── Loading skeleton ─────────────────────────────────────────────────────────
-
 function SkeletonFrame({ isDesktop }: { isDesktop: boolean }) {
+  if (isDesktop) {
+    return (
+      <div className="rounded-2xl overflow-hidden border border-border/60 shadow-sm aspect-[16/10]">
+        <div className="w-full h-full shimmer" />
+      </div>
+    );
+  }
+  // Mobile skeleton: flat app screen style
   return (
-    <div className={`rounded-2xl overflow-hidden border border-border/60 shadow-sm ${isDesktop ? "aspect-[16/10]" : "aspect-[9/19.5] max-w-[390px] mx-auto"}`}>
-      <div className="w-full h-full shimmer" />
+    <div className="mx-auto overflow-hidden rounded-2xl border border-border/60 shadow-sm" style={{ width: 390, maxWidth: "100%" }}>
+      {/* Status bar */}
+      <div className="h-11 shimmer" />
+      {/* Content area */}
+      <div className="aspect-[390/700] shimmer" />
+      {/* Bottom nav */}
+      <div className="h-16 shimmer" />
     </div>
   );
 }
 
-// ─── Device frame ─────────────────────────────────────────────────────────────
-
+// ─── Desktop device frame ─────────────────────────────────────────────────────
 function DesktopFrame({ children }: { children: React.ReactNode }) {
   return (
     <div className="rounded-2xl overflow-hidden border border-border/60 shadow-lg bg-zinc-100">
@@ -124,27 +133,45 @@ function DesktopFrame({ children }: { children: React.ReactNode }) {
   );
 }
 
-function MobileFrame({ children }: { children: React.ReactNode }) {
+// ─── Mobile app frame (flat Staffbase app style) ──────────────────────────────
+function MobileAppFrame({ children }: { children: React.ReactNode }) {
   return (
-    <div className="rounded-[2.5rem] overflow-hidden border-4 border-zinc-800 shadow-2xl bg-zinc-800 mx-auto" style={{ maxWidth: 390 }}>
-      {/* Notch */}
-      <div className="h-7 bg-zinc-900 flex items-center justify-center">
-        <div className="w-20 h-4 rounded-full bg-zinc-800" />
+    <div
+      className="mx-auto overflow-hidden rounded-2xl border border-border/60 shadow-xl bg-white"
+      style={{ width: 390, maxWidth: "100%" }}
+    >
+      {/* iOS-style status bar */}
+      <div className="h-11 bg-white flex items-center justify-between px-5 border-b border-zinc-100">
+        <span className="text-[13px] font-semibold text-zinc-900 tabular-nums">9:41</span>
+        <div className="flex items-center gap-1.5">
+          {/* Signal bars */}
+          <svg width="17" height="12" viewBox="0 0 17 12" fill="none">
+            <rect x="0" y="7" width="3" height="5" rx="0.5" fill="#1C1C1E" />
+            <rect x="4.5" y="5" width="3" height="7" rx="0.5" fill="#1C1C1E" />
+            <rect x="9" y="3" width="3" height="9" rx="0.5" fill="#1C1C1E" />
+            <rect x="13.5" y="0" width="3" height="12" rx="0.5" fill="#1C1C1E" />
+          </svg>
+          {/* WiFi */}
+          <svg width="16" height="12" viewBox="0 0 16 12" fill="none">
+            <path d="M8 9.5C8.83 9.5 9.5 10.17 9.5 11S8.83 12.5 8 12.5 6.5 11.83 6.5 11 7.17 9.5 8 9.5Z" fill="#1C1C1E"/>
+            <path d="M8 6C9.93 6 11.68 6.78 12.95 8.05L14.07 6.93C12.5 5.36 10.36 4.4 8 4.4S3.5 5.36 1.93 6.93L3.05 8.05C4.32 6.78 6.07 6 8 6Z" fill="#1C1C1E"/>
+            <path d="M8 2.5C11.04 2.5 13.78 3.77 15.72 5.78L16.83 4.67C14.6 2.37 11.46 1 8 1S1.4 2.37-.83 4.67L.28 5.78C2.22 3.77 4.96 2.5 8 2.5Z" fill="#1C1C1E" opacity="0.4"/>
+          </svg>
+          {/* Battery */}
+          <svg width="25" height="12" viewBox="0 0 25 12" fill="none">
+            <rect x="0.5" y="0.5" width="21" height="11" rx="3.5" stroke="#1C1C1E" strokeOpacity="0.35"/>
+            <rect x="1.5" y="1.5" width="18" height="9" rx="2.5" fill="#1C1C1E"/>
+            <path d="M23 4v4a2 2 0 000-4z" fill="#1C1C1E" fillOpacity="0.4"/>
+          </svg>
+        </div>
       </div>
-      {/* Screen */}
-      <div className="overflow-hidden rounded-b-[1.8rem]">
-        {children}
-      </div>
-      {/* Home indicator */}
-      <div className="h-5 bg-zinc-900 flex items-center justify-center">
-        <div className="w-16 h-1 rounded-full bg-zinc-600" />
-      </div>
+      {/* App content */}
+      {children}
     </div>
   );
 }
 
 // ─── Preview panel ────────────────────────────────────────────────────────────
-
 function PreviewPanel({
   html,
   label,
@@ -157,7 +184,6 @@ function PreviewPanel({
   containerWidth: number;
 }) {
   const [blobUrl, setBlobUrl] = useState<string | null>(null);
-
   useEffect(() => {
     const blob = new Blob([html], { type: "text/html" });
     const url = URL.createObjectURL(blob);
@@ -166,77 +192,206 @@ function PreviewPanel({
   }, [html]);
 
   const isDesktop = label === "Desktop";
-  const effectiveContainer = isDesktop ? containerWidth : Math.min(containerWidth, 390);
-  const scale = effectiveContainer / viewportWidth;
-  const scaledHeight = isDesktop
-    ? Math.round(viewportWidth * 0.625)
-    : Math.round(viewportWidth * 2.16);
-  const displayHeight = Math.round(scaledHeight * scale);
 
   if (!blobUrl) return null;
 
-  const iframeEl = (
-    <div
-      style={{
-        width: `${viewportWidth}px`,
-        height: `${scaledHeight}px`,
-        transform: `scale(${scale})`,
-        transformOrigin: "top left",
-        position: "absolute",
-        top: 0,
-        left: 0,
-        overflow: "hidden",
-      }}
-    >
-      <iframe
-        src={blobUrl}
-        style={{
-          width: `${viewportWidth}px`,
-          height: `${scaledHeight}px`,
-          border: "none",
-          display: "block",
-        }}
-        sandbox="allow-scripts allow-same-origin"
-        title={`${label} preview`}
-      />
-    </div>
-  );
+  if (isDesktop) {
+    // Desktop: scale to fit container
+    const scale = containerWidth / viewportWidth;
+    const scaledHeight = Math.round(viewportWidth * 0.625);
+    const displayHeight = Math.round(scaledHeight * scale);
+    return (
+      <div className="flex flex-col gap-3 fade-in-up">
+        <div className="flex items-center gap-2 text-sm font-semibold text-foreground">
+          <Monitor className="w-4 h-4 text-primary" />
+          <span>デスクトップ</span>
+          <span className="text-xs font-normal text-muted-foreground">(1280px)</span>
+        </div>
+        <DesktopFrame>
+          <div style={{ width: "100%", height: `${displayHeight}px`, position: "relative", overflow: "hidden" }}>
+            <div
+              style={{
+                width: `${viewportWidth}px`,
+                height: `${scaledHeight}px`,
+                transform: `scale(${scale})`,
+                transformOrigin: "top left",
+                position: "absolute",
+                top: 0,
+                left: 0,
+              }}
+            >
+              <iframe
+                src={blobUrl}
+                style={{ width: `${viewportWidth}px`, height: `${scaledHeight}px`, border: "none", display: "block" }}
+                sandbox="allow-scripts allow-same-origin"
+                title="Desktop preview"
+              />
+            </div>
+          </div>
+        </DesktopFrame>
+      </div>
+    );
+  }
 
-  const screenContent = (
-    <div style={{ width: "100%", height: `${displayHeight}px`, position: "relative", overflow: "hidden" }}>
-      {iframeEl}
-    </div>
-  );
+  // Mobile: flat Staffbase app — show at natural 390px width, scale only if container is narrower
+  const mobileViewport = 390;
+  const mobileContentHeight = 750; // visible app content height (status bar excluded)
+  const effectiveScale = Math.min(1, containerWidth / mobileViewport);
+  const displayHeight = Math.round(mobileContentHeight * effectiveScale);
 
   return (
     <div className="flex flex-col gap-3 fade-in-up">
       <div className="flex items-center gap-2 text-sm font-semibold text-foreground">
-        {isDesktop ? (
-          <Monitor className="w-4 h-4 text-primary" />
-        ) : (
-          <Smartphone className="w-4 h-4 text-primary" />
-        )}
-        <span>{label}</span>
-        <span className="text-xs font-normal text-muted-foreground">({viewportWidth}px)</span>
+        <Smartphone className="w-4 h-4 text-primary" />
+        <span>モバイル</span>
+        <span className="text-xs font-normal text-muted-foreground">(390px · iPhone 13)</span>
       </div>
-      {isDesktop ? (
-        <DesktopFrame>{screenContent}</DesktopFrame>
-      ) : (
-        <MobileFrame>{screenContent}</MobileFrame>
-      )}
+      <MobileAppFrame>
+        <div style={{ width: "100%", height: `${displayHeight}px`, position: "relative", overflow: "hidden" }}>
+          <div
+            style={{
+              width: `${mobileViewport}px`,
+              height: `${mobileContentHeight}px`,
+              transform: `scale(${effectiveScale})`,
+              transformOrigin: "top left",
+              position: "absolute",
+              top: 0,
+              left: 0,
+            }}
+          >
+            <iframe
+              src={blobUrl}
+              style={{ width: `${mobileViewport}px`, height: `${mobileContentHeight}px`, border: "none", display: "block" }}
+              sandbox="allow-scripts allow-same-origin"
+              title="Mobile preview"
+            />
+          </div>
+        </div>
+      </MobileAppFrame>
     </div>
   );
 }
 
-// ─── Main page ────────────────────────────────────────────────────────────────
+// ─── AI Prompt panel ──────────────────────────────────────────────────────────
+function AiPromptPanel({
+  companyName,
+  websiteUrl,
+  brandData,
+  initialPrompt,
+  onNewPrompt,
+}: {
+  companyName: string;
+  websiteUrl: string;
+  brandData: BrandData;
+  initialPrompt: string | null;
+  onNewPrompt: (p: string) => void;
+}) {
+  const [isGenerating, setIsGenerating] = useState(false);
+  const [copied, setCopied] = useState(false);
+  const generatePrompt = trpc.mock.generateImagePrompt.useMutation();
+  const promptText = initialPrompt;
 
+  const handleGenerate = async () => {
+    setIsGenerating(true);
+    try {
+      const result = await generatePrompt.mutateAsync({ companyName, websiteUrl, brandData });
+      onNewPrompt(result.prompt);
+    } catch {
+      toast.error("プロンプトの生成に失敗しました。再試行してください。");
+    } finally {
+      setIsGenerating(false);
+    }
+  };
+
+  const handleCopy = async () => {
+    if (!promptText) return;
+    await navigator.clipboard.writeText(promptText);
+    setCopied(true);
+    toast.success("プロンプトをコピーしました");
+    setTimeout(() => setCopied(false), 2000);
+  };
+
+  return (
+    <div className="rounded-2xl border border-border/60 bg-card shadow-sm overflow-hidden">
+      {/* Header */}
+      <div className="flex items-center justify-between px-5 py-4 border-b border-border/40 bg-gradient-to-r from-violet-50/60 to-indigo-50/40">
+        <div className="flex items-center gap-2.5">
+          <div className="w-8 h-8 rounded-xl bg-violet-100 flex items-center justify-center">
+            <Wand2 className="w-4 h-4 text-violet-600" />
+          </div>
+          <div>
+            <h3 className="text-sm font-semibold text-foreground">AI画像生成プロンプト</h3>
+            <p className="text-xs text-muted-foreground">Midjourney / DALL-E / Stable Diffusion 向け</p>
+          </div>
+        </div>
+        {promptText && (
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={handleCopy}
+            className="gap-1.5 text-xs h-8"
+          >
+            {copied ? <Check className="w-3.5 h-3.5 text-emerald-500" /> : <Copy className="w-3.5 h-3.5" />}
+            {copied ? "コピー済み" : "コピー"}
+          </Button>
+        )}
+      </div>
+      {/* Body */}
+      <div className="p-5">
+        {!promptText && !isGenerating && (
+          <div className="flex flex-col items-center gap-4 py-6 text-center">
+            <p className="text-sm text-muted-foreground max-w-sm leading-relaxed">
+              生成したモックUIをベースに、他のAIツールで本物のロゴと実写画像を組み込んだ
+              高品質なイントラネット画像を作るためのプロンプトを生成します。
+            </p>
+            <Button onClick={handleGenerate} className="gap-2 bg-violet-600 hover:bg-violet-700 text-white">
+              <Wand2 className="w-4 h-4" />
+              プロンプトを生成
+            </Button>
+          </div>
+        )}
+        {isGenerating && (
+          <div className="flex items-center gap-3 py-6 justify-center">
+            <Loader2 className="w-4 h-4 animate-spin text-violet-600" />
+            <span className="text-sm text-muted-foreground">{companyName}向けプロンプトを生成中…</span>
+          </div>
+        )}
+        {promptText && (
+          <div className="space-y-3">
+            <div className="relative">
+              <pre className="text-xs text-foreground/80 leading-relaxed whitespace-pre-wrap bg-muted/40 rounded-xl p-4 border border-border/40 font-sans max-h-64 overflow-y-auto">
+                {promptText}
+              </pre>
+            </div>
+            <p className="text-xs text-muted-foreground">
+              このプロンプトをコピーして、お好みのAI画像生成ツールに貼り付けてください。
+              モックUIのスクリーンショットと合わせて使用すると、より精度の高い画像が生成されます。
+            </p>
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={handleGenerate}
+              disabled={isGenerating}
+              className="gap-1.5 text-xs text-muted-foreground"
+            >
+              <RefreshCw className="w-3.5 h-3.5" />
+              再生成
+            </Button>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
+// ─── Main component ───────────────────────────────────────────────────────────
 export default function Home() {
   const [companyName, setCompanyName] = useState("");
   const [websiteUrl, setWebsiteUrl] = useState("");
   const [step, setStep] = useState<Step>("idle");
   const [brandData, setBrandData] = useState<BrandData | null>(null);
   const [mockHtml, setMockHtml] = useState<string | null>(null);
-
+  const [imagePrompt, setImagePrompt] = useState<string | null>(null);
   const desktopContainerRef = useRef<HTMLDivElement>(null);
   const mobileContainerRef = useRef<HTMLDivElement>(null);
   const [desktopWidth, setDesktopWidth] = useState(900);
@@ -258,21 +413,20 @@ export default function Home() {
 
   const extractBrand = trpc.mock.extractBrand.useMutation();
   const generateMock = trpc.mock.generateMock.useMutation();
+  const generateImagePromptMutation = trpc.mock.generateImagePrompt.useMutation();
 
   const handleGenerate = useCallback(async (name: string, url: string) => {
     if (!name.trim() || !url.trim()) {
-      toast.error("Please enter both company name and website URL.");
+      toast.error("企業名とURLを入力してください。");
       return;
     }
     try { new URL(url); } catch {
-      toast.error("Please enter a valid URL (e.g. https://example.com).");
+      toast.error("有効なURLを入力してください（例: https://example.com）。");
       return;
     }
-
     setStep("extracting");
     setBrandData(null);
     setMockHtml(null);
-
     try {
       const brand = await extractBrand.mutateAsync({ companyName: name, websiteUrl: url });
       setBrandData(brand);
@@ -280,26 +434,29 @@ export default function Home() {
       const result = await generateMock.mutateAsync({ companyName: name, brandData: brand });
       setMockHtml(result.html);
       setStep("done");
+      // Auto-generate AI image prompt in background
+      generateImagePromptMutation.mutateAsync({ companyName: name, websiteUrl: url, brandData: brand })
+        .then(r => setImagePrompt(r.prompt))
+        .catch(() => { /* silent fail, user can retry */ });
     } catch (err: unknown) {
       setStep("error");
-      const message = err instanceof Error ? err.message : "Generation failed. Please try again.";
+      const message = err instanceof Error ? err.message : "生成に失敗しました。再試行してください。";
       toast.error(message);
     }
-  }, [extractBrand, generateMock]);
+  }, [extractBrand, generateMock, generateImagePromptMutation]);
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     handleGenerate(companyName, websiteUrl);
   };
-
   const handleRegenerate = () => handleGenerate(companyName, websiteUrl);
-
   const handleReset = () => {
     setCompanyName("");
     setWebsiteUrl("");
     setStep("idle");
     setBrandData(null);
     setMockHtml(null);
+    setImagePrompt(null);
   };
 
   const isLoading = step === "extracting" || step === "generating";
@@ -318,11 +475,8 @@ export default function Home() {
                 <rect x="11" y="11" width="6" height="6" rx="1.5" fill="white" fillOpacity="0.95" />
               </svg>
             </div>
-            <div>
-              <span className="font-semibold text-sm tracking-tight">Staffbase Mock Visualizer</span>
-            </div>
+            <span className="font-semibold text-sm tracking-tight">Staffbase Mock Visualizer</span>
           </div>
-
           <div className="flex items-center gap-2">
             {(step === "done" || step === "error") && (
               <>
@@ -333,7 +487,7 @@ export default function Home() {
                   className="gap-1.5 text-muted-foreground hover:text-foreground text-xs"
                 >
                   <RotateCcw className="w-3.5 h-3.5" />
-                  Reset
+                  リセット
                 </Button>
                 {step === "done" && (
                   <Button
@@ -344,7 +498,7 @@ export default function Home() {
                     className="gap-1.5 text-xs"
                   >
                     <RefreshCw className="w-3.5 h-3.5" />
-                    Regenerate
+                    再生成
                   </Button>
                 )}
               </>
@@ -354,25 +508,23 @@ export default function Home() {
       </header>
 
       <main className="flex-1 max-w-screen-2xl mx-auto w-full px-6 py-10">
-
         {/* ── IDLE: Hero + form ───────────────────────────────────────────── */}
         {step === "idle" && (
           <div className="flex flex-col items-center text-center gap-10 py-12 fade-in-up">
             <div className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full bg-primary/8 border border-primary/15 text-primary text-xs font-semibold tracking-wide uppercase">
               <Sparkles className="w-3.5 h-3.5" />
-              AI-Powered · No external images
+              AI搭載 · 外部画像不使用
             </div>
-
             <div className="space-y-4 max-w-2xl">
               <h1 className="text-5xl sm:text-6xl font-bold tracking-tight text-foreground leading-[1.05]">
-                Visualize your brand<br />
-                <span className="text-primary">in Staffbase</span>
+                ブランドを<br />
+                <span className="text-primary">Staffbaseで可視化</span>
               </h1>
               <p className="text-lg text-muted-foreground leading-relaxed max-w-xl mx-auto">
-                Enter a company name and website URL. The AI extracts brand colors and generates a fully branded Staffbase intranet — desktop and mobile, instantly.
+                企業名と公式サイトURLを入力するだけ。AIがブランドカラーを抽出し、
+                デスクトップとモバイルのStaffbaseイントラネットモックを即座に生成します。
               </p>
             </div>
-
             {/* Form */}
             <form
               onSubmit={handleSubmit}
@@ -381,11 +533,11 @@ export default function Home() {
               <div className="space-y-1.5">
                 <Label htmlFor="company" className="text-xs font-semibold text-muted-foreground uppercase tracking-wider flex items-center gap-1.5">
                   <Building2 className="w-3.5 h-3.5" />
-                  Company Name
+                  企業名
                 </Label>
                 <Input
                   id="company"
-                  placeholder="e.g. Toyota, Siemens, Salesforce"
+                  placeholder="例: トヨタ、ソニー、NTT"
                   value={companyName}
                   onChange={e => setCompanyName(e.target.value)}
                   className="h-11"
@@ -395,12 +547,12 @@ export default function Home() {
               <div className="space-y-1.5">
                 <Label htmlFor="url" className="text-xs font-semibold text-muted-foreground uppercase tracking-wider flex items-center gap-1.5">
                   <Globe className="w-3.5 h-3.5" />
-                  Official Website URL
+                  公式サイトURL
                 </Label>
                 <Input
                   id="url"
                   type="url"
-                  placeholder="https://www.example.com"
+                  placeholder="https://www.example.co.jp"
                   value={websiteUrl}
                   onChange={e => setWebsiteUrl(e.target.value)}
                   className="h-11"
@@ -412,19 +564,18 @@ export default function Home() {
                 disabled={!companyName.trim() || !websiteUrl.trim()}
               >
                 <Sparkles className="w-4 h-4" />
-                Generate Mock
+                モックを生成
               </Button>
             </form>
-
             {/* Feature tags */}
             <div className="flex flex-wrap justify-center gap-2">
               {[
-                "Brand color extraction",
-                "Desktop preview (1280px)",
-                "Mobile preview (390px)",
-                "CSS-only visuals",
-                "No external images",
-                "Regenerate anytime",
+                "ブランドカラー自動抽出",
+                "デスクトップ (1280px)",
+                "モバイル (390px · iPhone 13)",
+                "CSSのみで描画",
+                "外部画像不使用",
+                "AI画像生成プロンプト付き",
               ].map(f => (
                 <span key={f} className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-muted border border-border/50 text-xs text-muted-foreground">
                   <CheckCircle2 className="w-3 h-3 text-emerald-500" />
@@ -445,26 +596,24 @@ export default function Home() {
               </div>
               <StepIndicator step={step} />
             </div>
-
             <div className="flex items-center gap-3 px-5 py-4 rounded-xl bg-primary/5 border border-primary/15">
               <Loader2 className="w-4 h-4 text-primary animate-spin shrink-0" />
               <p className="text-sm text-primary font-medium">
                 {step === "extracting"
-                  ? `Analyzing ${companyName}'s brand identity and color palette…`
-                  : `Generating branded Staffbase intranet mock UI…`}
+                  ? `${companyName}のブランドカラーとアイデンティティを解析中…`
+                  : `ブランドに合わせたStaffbaseイントラネットモックを生成中…`}
               </p>
             </div>
-
             <div className="grid grid-cols-1 xl:grid-cols-[1fr_420px] gap-8 items-start">
               <div>
                 <div className="flex items-center gap-2 text-sm font-semibold text-muted-foreground mb-3">
-                  <Monitor className="w-4 h-4" /> Desktop <span className="font-normal text-xs">(1280px)</span>
+                  <Monitor className="w-4 h-4" /> デスクトップ <span className="font-normal text-xs">(1280px)</span>
                 </div>
                 <SkeletonFrame isDesktop />
               </div>
               <div>
                 <div className="flex items-center gap-2 text-sm font-semibold text-muted-foreground mb-3">
-                  <Smartphone className="w-4 h-4" /> Mobile <span className="font-normal text-xs">(390px)</span>
+                  <Smartphone className="w-4 h-4" /> モバイル <span className="font-normal text-xs">(390px)</span>
                 </div>
                 <SkeletonFrame isDesktop={false} />
               </div>
@@ -498,10 +647,10 @@ export default function Home() {
             {/* Brand details */}
             <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5">
               {[
-                { label: "Primary", value: brandData.primaryColor, color: brandData.primaryColor },
-                { label: "Secondary", value: brandData.secondaryColor, color: brandData.secondaryColor },
-                { label: "Accent", value: brandData.accentColor, color: brandData.accentColor },
-                { label: "Font", value: brandData.fontStyle, color: null },
+                { label: "プライマリー", value: brandData.primaryColor, color: brandData.primaryColor },
+                { label: "セカンダリー", value: brandData.secondaryColor, color: brandData.secondaryColor },
+                { label: "アクセント", value: brandData.accentColor, color: brandData.accentColor },
+                { label: "フォント", value: brandData.fontStyle, color: null },
               ].map(item => (
                 <div key={item.label} className="flex items-center gap-2.5 px-3 py-2.5 rounded-xl bg-card border border-border/60 text-xs">
                   {item.color ? (
@@ -519,7 +668,7 @@ export default function Home() {
 
             {/* Tagline */}
             <div className="px-4 py-3 rounded-xl bg-muted/50 border border-border/40 text-sm text-muted-foreground italic">
-              "{brandData.tagline}"
+              「{brandData.tagline}」
             </div>
 
             {/* Preview panels */}
@@ -542,13 +691,22 @@ export default function Home() {
               </div>
             </div>
 
+            {/* AI Image Prompt Panel */}
+            <AiPromptPanel
+              companyName={companyName}
+              websiteUrl={websiteUrl}
+              brandData={brandData}
+              initialPrompt={imagePrompt}
+              onNewPrompt={setImagePrompt}
+            />
+
             {/* Mobile action buttons */}
             <div className="flex sm:hidden items-center gap-2 pt-2">
               <Button variant="ghost" size="sm" onClick={handleReset} className="gap-1.5 text-muted-foreground text-xs">
-                <RotateCcw className="w-3.5 h-3.5" /> Reset
+                <RotateCcw className="w-3.5 h-3.5" /> リセット
               </Button>
               <Button variant="outline" size="sm" onClick={handleRegenerate} className="gap-1.5 text-xs">
-                <RefreshCw className="w-3.5 h-3.5" /> Regenerate
+                <RefreshCw className="w-3.5 h-3.5" /> 再生成
               </Button>
             </div>
           </div>
@@ -561,15 +719,15 @@ export default function Home() {
               ⚠️
             </div>
             <div>
-              <h3 className="font-semibold text-lg">Generation failed</h3>
-              <p className="text-sm text-muted-foreground mt-1">Something went wrong. Please try again.</p>
+              <h3 className="font-semibold text-lg">生成に失敗しました</h3>
+              <p className="text-sm text-muted-foreground mt-1">問題が発生しました。再試行してください。</p>
             </div>
             <div className="flex gap-2">
               <Button variant="outline" onClick={handleReset} className="gap-1.5">
-                <RotateCcw className="w-3.5 h-3.5" /> Reset
+                <RotateCcw className="w-3.5 h-3.5" /> リセット
               </Button>
               <Button onClick={handleRegenerate} className="gap-1.5">
-                <RefreshCw className="w-3.5 h-3.5" /> Try Again
+                <RefreshCw className="w-3.5 h-3.5" /> 再試行
               </Button>
             </div>
           </div>
@@ -579,7 +737,7 @@ export default function Home() {
       {/* ── Footer ─────────────────────────────────────────────────────────── */}
       <footer className="border-t border-border/40 py-4 px-6">
         <p className="text-center text-xs text-muted-foreground/60">
-          Staffbase Mock Visualizer · Presales demo tool · All visuals are CSS-only, no external images
+          Staffbase Mock Visualizer · プリセールスデモツール · すべてのビジュアルはCSSのみで描画
         </p>
       </footer>
     </div>

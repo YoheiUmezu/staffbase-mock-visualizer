@@ -15,3 +15,8 @@
 - [x] Fix brand color extraction: fetch actual website HTML/CSS and pass to LLM for real color detection
 - [x] Fix mobile preview width to iPhone 13 actual CSS width (390px)
 - [x] Generate all mock UI text content in Japanese
+
+## Bug Fixes (Round 3)
+- [x] Fix mobile preview: replace clipped phone frame with flat Staffbase app screen (status bar + bottom nav visible, no bezel cutoff)
+- [x] Add AI image generation prompt panel: after mock generation, show a copyable company-specific prompt for use in other AI tools
+- [x] Add tRPC procedure to generate the AI image prompt via LLM based on brand data + generated HTML structure
