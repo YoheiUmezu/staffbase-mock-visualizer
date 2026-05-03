@@ -37,3 +37,8 @@
 - [x] Mock HTML: add <img alt="[image generation prompt]"> inside each news card at the appropriate thumbnail position
 - [x] Mock HTML: alt text of each img must be a concise English image generation prompt matching the card's content
 - [x] SD prompt: remove 4K/8K/resolution quality tags from ④品質 section
+
+## Bug Fixes (Round 6)
+- [x] News card img alt: rewrite to Flux-optimized prompt format (subject, style, lighting, composition — no resolution tags)
+- [x] Nav logo: add <img alt="[Flux logo recreation prompt]"> in the navigation bar logo area with company-specific logo description
+- [x] Both alt prompts must be in English and immediately usable in Cursor + Flux

@@ -139,6 +139,7 @@ function postProcessMockHtml(html: string, brandData: {
   secondaryColor: string;
   accentColor: string;
   textColor: string;
+  logoText?: string;
 }): string {
   let processed = html;
 
@@ -226,7 +227,7 @@ function postProcessMockHtml(html: string, brandData: {
         const cardOpenRe = new RegExp(`(<div[^>]*class="[^"]*${cls}[^"]*"[^>]*>)`, 'gi');
         let cardMatch: RegExpExecArray | null;
         let offset = 0;
-        const placeholderImg = `<img alt="corporate intranet news thumbnail, professional business environment" style="width:100%;height:160px;object-fit:cover;border-radius:8px 8px 0 0;background:#e0e0e0;display:block;" src="">`;
+        const placeholderImg = `<img alt="Japanese corporate office environment, business professionals at work, corporate photography style, soft natural light, wide shot, clean modern interior" style="width:100%;height:160px;object-fit:cover;border-radius:8px 8px 0 0;background:#e0e0e0;display:block;" src="">`;
         while ((cardMatch = cardOpenRe.exec(processed)) !== null) {
           const insertAt = cardMatch.index + offset + cardMatch[0].length;
           processed = processed.slice(0, insertAt) + placeholderImg + processed.slice(insertAt);
@@ -234,6 +235,20 @@ function postProcessMockHtml(html: string, brandData: {
         }
         break;
       }
+    }
+  }
+
+  // ── Ensure nav logo has a Flux-ready <img data-logo="true"> placeholder ────
+  // If the LLM did not include a data-logo img, inject one into the first nav/header element
+  if (!processed.includes('data-logo="true"')) {
+    const logoAlt = `${brandData.logoText || 'company'} corporate logo, bold wordmark with primary color ${brandData.primaryColor}, flat vector design, clean white background, professional corporate identity, minimal style, no gradients`;
+    const logoImgTag = `<img alt="${logoAlt}" style="height:32px;width:auto;display:none;vertical-align:middle;" src="" data-logo="true">`;
+    // Try to inject after the first nav or header opening tag
+    const navOpenRe = /<(nav|header)[^>]*>/i;
+    const navMatch = navOpenRe.exec(processed);
+    if (navMatch) {
+      const insertAt = navMatch.index + navMatch[0].length;
+      processed = processed.slice(0, insertAt) + logoImgTag + processed.slice(insertAt);
     }
   }
 
@@ -396,13 +411,32 @@ Return ONLY valid JSON:
 - フォントファミリー: ${fontFamily}
 【厳守事項】
 1. 外部画像は一切使用禁止。background-imageに外部URLは使わない。すべてのビジュアルはCSSシェイプ、インラインSVG、CSSグラデーション、Unicode文字のみで描画すること。
-2. ただし、各ニュースカードのサムネイル領域には必ず <img alt="[英語の画像生成プロンプト]" style="width:100%;height:160px;object-fit:cover;border-radius:8px 8px 0 0;background:#e0e0e0;display:block;" src=""> を配置すること。altの内容は、そのカードのタイトルや内容に合致した、Stable Diffusionで使える簡潔な英語プロンプト（例: "corporate meeting room with modern interior, professional atmosphere"）にすること。
+2. ただし、各ニュースカードのサムネイル領域には必ず以下の形式で<img>を配置すること:
+   <img alt="[Flux image generation prompt]" style="width:100%;height:160px;object-fit:cover;border-radius:8px 8px 0 0;background:#e0e0e0;display:block;" src="">
+   altの内容は、Cursor + Fluxで即座に使えるFLUX.1向け英語プロンプトにすること。形式は以下の4要素を含めること:
+   - Subject（被写体）: そのカードの内容に合った具体的な被写体
+   - Style（スタイル）: "corporate photography style, editorial look" など
+   - Lighting（照明）: "soft natural light", "studio lighting" など
+   - Composition（構図）: "wide shot", "close-up", "overhead view" など
+   例: "Japanese business professionals in a modern conference room, corporate photography style, soft natural light, wide shot, clean background"
+   各カードのテーマに合わせて異なるプロンプトを生成すること。
 3. すべてのCSSは<style>タグ内にインラインで記述し、単一HTMLファイルとして完結させること。
 4. デスクトップ（1280px）とモバイル（390px）の両方に対応するCSSメディアクエリを使用すること。
 5. すべてのテキストコンテンツは日本語で記述すること（ナビゲーション、見出し、本文、ボタン、バッジ、日付など）。
 6. 【空白禁止】各セクションは必ず十分なコンテンツで埋めること。空のdiv、最小限のコンテンツ、余白だらけのセクションは禁止。
 7. 以下のセクションをすべて含め、それぞれ十分なコンテンツで埋めること:
-   a. 【トップナビゲーションバー】SVG/CSSロゴマーク＋企業名テキスト、ナビリンク（ホーム・ニュース・ナレッジ・社員・イベント）、ユーザーアバター（CSSサークル＋イニシャル）、通知ベルアイコン（SVG）。デスクトップのみ表示。
+   a. 【トップナビゲーションバー】以下の要素を含めること。デスクトップのみ表示。
+      - ロゴエリア: SVG/CSSによるロゴシェイプ（プライマリーカラー使用）と企業名テキストを並べる。さらに、ロゴの直後に以下の形式で<img>を配置すること（ロゴ画像の差し替え用プレースホルダー）:
+        <img alt="[Flux logo recreation prompt]" style="height:32px;width:auto;display:none;" src="" data-logo="true">
+        altの内容は、Cursor + Fluxで企業ロゴを正確に再現するためのFLUX.1向け英語プロンプトにすること。形式は以下を含めること:
+        - Logo description: 色・形状・タイポグラフィの特徴を具体的に記述（例: "horizontal wordmark with bold sans-serif font"）
+        - Brand colors: HEXコードを含めて正確に指定
+        - Style: "flat vector logo design, clean white background, professional corporate identity"
+        - Negative prompt相当の注意: "no gradients, no shadows, simple geometric shapes"
+        例: "${logoText} company logo, bold geometric diamond shape in ${primaryColor}, white wordmark text, flat vector design, clean white background, corporate identity, minimal style"
+      - ナビリンク（ホーム・ニュース・ナレッジ・社員・イベント）
+      - ユーザーアバター（CSSサークル＋イニシャル）
+      - 通知ベルアイコン（SVG）
    b. 【ヒーローセクション】ブランドカラーのフルワイドグラデーションバナー（最低200px高さ）、大きなウェルカム見出し（日本語）、タグライン、CTAボタン（日本語）、装飾的なSVG幾何学シェイプを最低2つ含めること。
    c. 【ニュースフィード】3枚のニュースカード。各カードには: サムネイル<img>（上記ルール2に従う）、カテゴリバッジ、タイトル（15文字以上）、本文抜粋（40文字以上）、日付、「続きを読む」リンク。すべて日本語。
    d. 【クイックリンク】6個のアイコンタイル（SVGアイコン付き）：「人事ポータル」「ITヘルプデスク」「社内規程・ポリシー」「福利厚生」「社員名簿」「社内イベント」。各タイルにはアイコンとラベルを含めること。
