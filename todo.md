@@ -61,3 +61,9 @@
 - [x] Input form: add ブランドトーン selector (先進的 / 堅実 / 高級感) as radio buttons or select
 - [x] tRPC: pass industry and brandTone from extractBrand and generateMock input schemas
 - [x] LLM prompt: use industry and brandTone to influence mock style and community group names
+
+## Round 10
+- [ ] News cards: exactly 4 items on both desktop and mobile (LLM prompt + post-process enforcement)
+- [ ] Quick links section: full-width layout (no sidebar constraint)
+- [ ] Community section: full-width layout (no sidebar constraint)
+- [ ] Mobile bottom nav: fix alignment/overflow so all icons are evenly spaced and not clipped
