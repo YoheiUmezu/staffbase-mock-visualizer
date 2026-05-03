@@ -196,6 +196,47 @@ function postProcessMockHtml(html: string, brandData: {
       processed = processed.replace('</body>', widget + '\n</body>');
     }
   }
+
+  // ── Enforce bottom-nav desktop hide ────────────────────────────────────────
+  // If the LLM generated a bottom-nav without proper media query hiding,
+  // inject a CSS rule to ensure it is hidden on desktop.
+  const bottomNavPatterns = ['bottom-nav', 'bottom-navigation', 'tab-bar', 'mobile-nav', 'mobile-bottom'];
+  for (const cls of bottomNavPatterns) {
+    if (processed.includes(cls)) {
+      // Check if a display:none rule for desktop already exists
+      const desktopHidePattern = new RegExp(`@media[^{]*min-width[^{]*{[^}]*\\.${cls}[^}]*display\\s*:\\s*none`, 'i');
+      if (!desktopHidePattern.test(processed)) {
+        // Inject a CSS rule before </style> to hide on desktop
+        const hideRule = `\n  /* Post-processor: hide bottom nav on desktop */\n  @media (min-width: 769px) { .${cls} { display: none !important; } }\n`;
+        processed = processed.replace('</style>', hideRule + '</style>');
+      }
+      break;
+    }
+  }
+
+  // ── Ensure each news card has an <img> placeholder ─────────────────────────
+  // Count existing <img> tags in news card areas
+  const imgCount = (processed.match(/<img\s/gi) || []).length;
+  if (imgCount === 0) {
+    // No img tags at all — inject placeholder img into each news card
+    // Look for news card patterns and inject img after the opening div
+    const newsCardPatterns = ['news-card', 'news-item', 'post-card', 'article-card', 'feed-item'];
+    for (const cls of newsCardPatterns) {
+      if (processed.includes(cls)) {
+        const cardOpenRe = new RegExp(`(<div[^>]*class="[^"]*${cls}[^"]*"[^>]*>)`, 'gi');
+        let cardMatch: RegExpExecArray | null;
+        let offset = 0;
+        const placeholderImg = `<img alt="corporate intranet news thumbnail, professional business environment" style="width:100%;height:160px;object-fit:cover;border-radius:8px 8px 0 0;background:#e0e0e0;display:block;" src="">`;
+        while ((cardMatch = cardOpenRe.exec(processed)) !== null) {
+          const insertAt = cardMatch.index + offset + cardMatch[0].length;
+          processed = processed.slice(0, insertAt) + placeholderImg + processed.slice(insertAt);
+          offset += placeholderImg.length;
+        }
+        break;
+      }
+    }
+  }
+
   return processed;
 }
 // ─── Router ───────────────────────────────────────────────────────────────────
@@ -341,7 +382,6 @@ Return ONLY valid JSON:
                   : "'Hiragino Sans', 'Noto Sans JP', 'Yu Gothic', 'Meiryo', sans-serif";
 
         const prompt = `あなたはエンタープライズ向けイントラネットUIの専門エンジニアです。「${companyName}」向けの、Staffbaseスタイルのイントラネットホーム画面を表す、完全な自己完結型HTMLファイルを生成してください。
-
 【ブランド仕様】
 - 企業名: ${companyName}
 - 業界: ${industry}
@@ -354,26 +394,25 @@ Return ONLY valid JSON:
 - 背景色: ${backgroundColor}
 - テキスト色: ${textColor}
 - フォントファミリー: ${fontFamily}
-
 【厳守事項】
-1. 外部画像は一切使用禁止。<img>タグ、外部URLのbackground-imageは使わない。すべてのビジュアルはCSSシェイプ、インラインSVG、CSSグラデーション、Unicode文字のみで描画すること。
-2. すべてのCSSは<style>タグ内にインラインで記述し、単一HTMLファイルとして完結させること。
-3. デスクトップ（1280px）とモバイル（390px）の両方に対応するCSSメディアクエリを使用すること。
-4. すべてのテキストコンテンツは日本語で記述すること（ナビゲーション、見出し、本文、ボタン、バッジ、日付など）。
-5. 以下のセクションを含めること:
-   a. 【トップナビゲーションバー】SVG/CSSロゴマーク＋企業名テキスト、ナビリンク（ホーム・ニュース・ナレッジ・社員・イベント）、ユーザーアバター（CSSサークル＋イニシャル）、通知ベルアイコン（SVG）
-   b. 【ヒーローセクション】ブランドカラーのフルワイドグラデーションバナー、大きなウェルカム見出し（日本語）、タグライン、CTAボタン（日本語）
-   c. 【ニュースフィード】3枚のニュースカード（カテゴリバッジ・タイトル・本文抜粋・日付・「続きを読む」リンク、すべて日本語）
-   d. 【クイックリンク】4〜6個のアイコンタイル（SVGアイコン）：「人事ポータル」「ITヘルプ」「社内規程」「福利厚生」「社員名簿」「イベント」
-   e. 【サイドバー（デスクトップのみ）】「必読コンテンツ」ウィジェット（重要度バッジ付き3件のリスト、未読マーク、タイトルと期限日）、「直近のイベント」リスト（2〜3件）、「社内統計」（アニメーション付きプログレスバー）
-   f. 【ボトムナビゲーション（モバイルのみ）】5タブ（ホーム・ニュース・検索・社員・プロフィール）、SVGアイコン付き
-6. ブランドカラーを一貫して使用：プライマリーはナビ/ヒーロー、セカンダリーはカード/サイドバー、アクセントはCTA/バッジ/ハイライト。
-7. タイポグラフィ：指定フォントファミリーを使用。見出しは太字、本文は通常ウェイト。
-8. 細部へのこだわり：カードのホバー状態（translateY＋シャドウ）、スムーズなトランジション、繊細なグラデーション、プロフェッショナルな余白。
-9. デザインは洗練されたエンタープライズ品質で、${companyName}のブランドらしさが伝わること。
-10. ヒーローセクションに装飾的なSVG要素（抽象シェイプ、波形、幾何学模様）を最低1つ含めること。
-11. モバイル表示（390px）では、ボトムナビゲーションを固定表示し、コンテンツが重ならないよう適切なpadding-bottomを設定すること。
-
+1. 外部画像は一切使用禁止。background-imageに外部URLは使わない。すべてのビジュアルはCSSシェイプ、インラインSVG、CSSグラデーション、Unicode文字のみで描画すること。
+2. ただし、各ニュースカードのサムネイル領域には必ず <img alt="[英語の画像生成プロンプト]" style="width:100%;height:160px;object-fit:cover;border-radius:8px 8px 0 0;background:#e0e0e0;display:block;" src=""> を配置すること。altの内容は、そのカードのタイトルや内容に合致した、Stable Diffusionで使える簡潔な英語プロンプト（例: "corporate meeting room with modern interior, professional atmosphere"）にすること。
+3. すべてのCSSは<style>タグ内にインラインで記述し、単一HTMLファイルとして完結させること。
+4. デスクトップ（1280px）とモバイル（390px）の両方に対応するCSSメディアクエリを使用すること。
+5. すべてのテキストコンテンツは日本語で記述すること（ナビゲーション、見出し、本文、ボタン、バッジ、日付など）。
+6. 【空白禁止】各セクションは必ず十分なコンテンツで埋めること。空のdiv、最小限のコンテンツ、余白だらけのセクションは禁止。
+7. 以下のセクションをすべて含め、それぞれ十分なコンテンツで埋めること:
+   a. 【トップナビゲーションバー】SVG/CSSロゴマーク＋企業名テキスト、ナビリンク（ホーム・ニュース・ナレッジ・社員・イベント）、ユーザーアバター（CSSサークル＋イニシャル）、通知ベルアイコン（SVG）。デスクトップのみ表示。
+   b. 【ヒーローセクション】ブランドカラーのフルワイドグラデーションバナー（最低200px高さ）、大きなウェルカム見出し（日本語）、タグライン、CTAボタン（日本語）、装飾的なSVG幾何学シェイプを最低2つ含めること。
+   c. 【ニュースフィード】3枚のニュースカード。各カードには: サムネイル<img>（上記ルール2に従う）、カテゴリバッジ、タイトル（15文字以上）、本文抜粋（40文字以上）、日付、「続きを読む」リンク。すべて日本語。
+   d. 【クイックリンク】6個のアイコンタイル（SVGアイコン付き）：「人事ポータル」「ITヘルプデスク」「社内規程・ポリシー」「福利厚生」「社員名簿」「社内イベント」。各タイルにはアイコンとラベルを含めること。
+   e. 【サイドバー（デスクトップのみ）】3つのウィジェットを必ず含めること: (1)「必読コンテンツ」ウィジェット（重要度バッジ付き3件）、(2)「直近のイベント」リスト（3件、日付・タイトル・場所付き）、(3)「社内統計」（3本のプログレスバー、数値ラベル付き）。
+   f. 【ボトムナビゲーション（モバイルのみ）】@media (max-width: 768px) のみで表示。5タブ（ホーム・ニュース・検索・社員・プロフィール）、SVGアイコン付き、position:fixed、bottom:0。デスクトップでは display:none にすること。
+8. ブランドカラーを一貫して使用：プライマリーはナビ/ヒーロー、セカンダリーはカード/サイドバー、アクセントはCTA/バッジ/ハイライト。
+9. タイポグラフィ：指定フォントファミリーを使用。見出しは太字、本文は通常ウェイト。
+10. 細部へのこだわり：カードのホバー状態（translateY＋シャドウ）、スムーズなトランジション、繊細なグラデーション、プロフェッショナルな余白。
+11. デザインは洗練されたエンタープライズ品質で、${companyName}のブランドらしさが伝わること。
+12. モバイル表示では、ボトムナビゲーションが固定されるため、コンテンツエリアに padding-bottom: 70px を設定すること。
 出力: <!DOCTYPE html>から始まる完全なHTMLファイルのみを返すこと。マークダウンのコードフェンス不要、説明文不要。`;
 
         const response = await invokeLLM({
@@ -436,7 +475,7 @@ Return ONLY valid JSON:
 ①レイアウト: 画面構成・UI要素の配置を具体的に記述（ナビゲーションバー、ヒーローバナー、ニュースカード、サイドバー、ボトムナビなど）
 ②ブランド: ${companyName}の公式ロゴの特徴（色・形状・フォント）、ブランドカラー${brandData.primaryColor}の使用箇所、${brandData.industry}らしいビジュアル表現
 ③ビジュアル: ヒーローバナーの背景画像の内容（${brandData.industry}・${brandData.brandTone}に合わせた実写イメージ）、ニュースカードのサムネイル画像の内容指示、全体的な雰囲気・トーン
-④品質: Stable Diffusionで高品質出力を得るための技術的指定（解像度、スタイル、レンダリング品質など）
+④品質: Stable Diffusionで高品質出力を得るための技術的指定（スタイル、レンダリング品質、照明、構図など）。4K・8K・解像度の数値指定は含めないこと。
 
 出力形式: 日本語で、すぐにStable Diffusionに貼り付けられる形式のプロンプトテキストのみを返してください。セクション見出し（①〜④）を含めること。`;
 

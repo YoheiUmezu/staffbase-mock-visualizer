@@ -30,3 +30,10 @@
 ## Bug Fixes (Round 4 — Deterministic Enforcement)
 - [x] Server-side: override LLM primaryColor with extractedNavColor when available (deterministic, not LLM-dependent)
 - [x] Server-side: post-process generated HTML to inject 必読コンテンツ widget and remove profile/avatar widgets
+
+## Bug Fixes (Round 5)
+- [x] Mock HTML: fill all sections so no empty whitespace appears (hero, news cards, sidebar, quick links all fully populated)
+- [x] Mock HTML: bottom navigation bar rendered only in mobile layout (not in desktop)
+- [x] Mock HTML: add <img alt="[image generation prompt]"> inside each news card at the appropriate thumbnail position
+- [x] Mock HTML: alt text of each img must be a concise English image generation prompt matching the card's content
+- [x] SD prompt: remove 4K/8K/resolution quality tags from ④品質 section
