@@ -198,9 +198,14 @@ function postProcessMockHtml(html: string, brandData: {
     }
   }
 
-  // ── Enforce bottom-nav desktop hide ────────────────────────────────────────
+  // ── Globally hide 社内統計 / progress-bar widgets on all viewports ──────────────
+  // Remove stats/progress widgets regardless of LLM output
+  const statsHideRule = `\n  /* Post-processor: hide 社内統計 and progress bar widgets globally */\n  [class*="stats"], [class*="statistic"], [class*="progress-widget"],\n  [class*="stat-widget"], [class*="company-stats"], [class*="social-stat"] { display: none !important; }\n`;
+  processed = processed.replace('</style>', statsHideRule + '</style>');
+
+  // ── Enforce bottom-nav desktop hide ───────────────────────────────────────
   // If the LLM generated a bottom-nav without proper media query hiding,
-  // inject a CSS rule to ensure it is hidden on desktop.
+  // inject a CSS rule to ensure it is hidden on desktop..
   const bottomNavPatterns = ['bottom-nav', 'bottom-navigation', 'tab-bar', 'mobile-nav', 'mobile-bottom'];
   for (const cls of bottomNavPatterns) {
     if (processed.includes(cls)) {
@@ -455,7 +460,7 @@ Return ONLY valid JSON:
    b. 【ヒーローセクション】ブランドカラーのフルワイドグラデーションバナー（最低200px高さ）、大きなウェルカム見出し（日本語）、タグライン、CTAボタン（日本語）、装飾的なSVG幾何学シェイプを最低2つ含めること。
    c. 【ニュースフィード】3枚のニュースカード。各カードには: サムネイル<img>（上記ルール2に従う）、カテゴリバッジ、タイトル（15文字以上）、本文抜粋（40文字以上）、日付、「続きを読む」リンク。すべて日本語。
    d. 【クイックリンク】6個のアイコンタイル（SVGアイコン付き）：「人事ポータル」「ITヘルプデスク」「社内規程・ポリシー」「福利厚生」「社員名簿」「社内イベント」。各タイルにはアイコンとラベルを含めること。
-   e. 【サイドバー（デスクトップのみ）】3つのウィジェットを必ず含めること: (1)「必読コンテンツ」ウィジェット（重要度バッジ付き3件）、(2)「直近のイベント」リスト（3件、日付・タイトル・場所付き）、(3)「社内統計」（3本のプログレスバー、数値ラベル付き）。このサイドバーは @media (max-width: 768px) では display:none にすること（モバイルでは非表示）。
+   e. 【サイドバー（デスクトップのみ）〃3つのウィジェットを必ず含めること: (1)「必読コンテンツ」ウィジェット（重要度バッジ付き3件）、(2)「直近のイベント」リスト（3件、日付・タイトル・場所付き）、(3)「お知らせ・アナウンス」ウィジェット（3件、各件に優先度バッジ・タイトル・日付付き）。社内統計やプログレスバーは一切含めないこと。このサイドバーは @media (max-width: 768px) では display:none にすること（モバイルでは非表示）。
    f. 【ボトムナビゲーション（モバイルのみ）】@media (max-width: 768px) のみで表示。5タブ（ホーム・ニュース・検索・社員・プロフィール）、SVGアイコン付き。CSSは以下を厳守すること:
       position: fixed; bottom: 0; left: 0; right: 0; width: 100%; box-sizing: border-box; display: flex; flex-direction: row; justify-content: space-around; align-items: center;
       各タブは flex: 1; text-align: center; にすること。デスクトップでは display:none にすること。

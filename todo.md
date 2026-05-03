@@ -48,3 +48,10 @@
 - [x] Mobile bottom nav: fix width so it spans full screen width without breaking
 - [x] Mobile: remove 社内統計 (progress bar widget) from mobile layout
 - [x] Desktop + Mobile: add company-specific community section (groups/channels relevant to the company's industry)
+
+## Bug Fixes (Round 8)
+- [ ] Desktop news cards: all cards fully populated, no empty whitespace (body text, category badge, author, date, read-more link all present)
+- [ ] Add dedicated コミュニティ section (new section with title "コミュニティ") to both desktop and mobile
+- [ ] Community cards: each has a thumbnail <img alt="[Flux prompt]"> at appropriate position
+
+## Bug Fixes (Round 8b — Urgent)- [x] Remove 社内統計 widget from desktop sidebar; replace with 「お知らせ・アナウンス」 widget (3 items with priority badge, title, date)
