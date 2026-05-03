@@ -20,3 +20,13 @@
 - [x] Fix mobile preview: replace clipped phone frame with flat Staffbase app screen (status bar + bottom nav visible, no bezel cutoff)
 - [x] Add AI image generation prompt panel: after mock generation, show a copyable company-specific prompt for use in other AI tools
 - [x] Add tRPC procedure to generate the AI image prompt via LLM based on brand data + generated HTML structure
+
+## Bug Fixes (Round 4)
+- [x] SD prompt: restructure to ①レイアウト ②ブランド ③ビジュアル ④品質 sections
+- [x] HTML download: add "HTMLをダウンロード" button that saves generated mock as .html file
+- [x] Nav color extraction: extract primary color specifically from nav/header background of target site
+- [x] Replace face widget: remove user profile/avatar widget from generated mock, replace with 必読コンテンツ widget
+
+## Bug Fixes (Round 4 — Deterministic Enforcement)
+- [x] Server-side: override LLM primaryColor with extractedNavColor when available (deterministic, not LLM-dependent)
+- [x] Server-side: post-process generated HTML to inject 必読コンテンツ widget and remove profile/avatar widgets

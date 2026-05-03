@@ -18,6 +18,7 @@ import {
   Copy,
   Check,
   Wand2,
+  Download,
 } from "lucide-react";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
@@ -700,8 +701,27 @@ export default function Home() {
               onNewPrompt={setImagePrompt}
             />
 
-            {/* Mobile action buttons */}
-            <div className="flex sm:hidden items-center gap-2 pt-2">
+            {/* Action buttons row */}
+            <div className="flex flex-wrap items-center gap-2 pt-2">
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => {
+                  const blob = new Blob([mockHtml], { type: "text/html" });
+                  const url = URL.createObjectURL(blob);
+                  const a = document.createElement("a");
+                  a.href = url;
+                  a.download = `${companyName.replace(/\s+/g, "_")}_staffbase_mock.html`;
+                  document.body.appendChild(a);
+                  a.click();
+                  document.body.removeChild(a);
+                  URL.revokeObjectURL(url);
+                  toast.success("HTMLファイルをダウンロードしました");
+                }}
+                className="gap-1.5 text-xs"
+              >
+                <Download className="w-3.5 h-3.5" /> HTMLをダウンロード
+              </Button>
               <Button variant="ghost" size="sm" onClick={handleReset} className="gap-1.5 text-muted-foreground text-xs">
                 <RotateCcw className="w-3.5 h-3.5" /> リセット
               </Button>

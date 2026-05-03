@@ -37,11 +37,10 @@ const mockGenerationSchema = z.object({
  * CSS custom properties, and meta theme-color tags.
  * Returns a compact string of color candidates to feed the LLM.
  */
-async function fetchBrandHints(url: string): Promise<string> {
+async function fetchBrandHints(url: string): Promise<{ hints: string; navColor: string }> {
   try {
     const controller = new AbortController();
     const timer = setTimeout(() => controller.abort(), 8000);
-
     const res = await fetch(url, {
       signal: controller.signal,
       headers: {
@@ -51,32 +50,66 @@ async function fetchBrandHints(url: string): Promise<string> {
       },
     });
     clearTimeout(timer);
-
-    if (!res.ok) return "";
+    if (!res.ok) return { hints: "", navColor: "" };
     const html = await res.text();
-
-    // Collect color candidates from the raw HTML/CSS text
     const candidates: string[] = [];
+    let navColor = "";
 
     // 1. meta theme-color
     const themeMatch = html.match(/theme-color[^>]*content=["']([^"']+)/i);
-    if (themeMatch?.[1]) candidates.push(`theme-color: ${themeMatch[1]}`);
+    if (themeMatch?.[1]) {
+      candidates.push(`theme-color: ${themeMatch[1]}`);
+      if (!navColor) navColor = themeMatch[1].trim();
+    }
 
-    // 2. CSS custom properties (--primary, --brand, --color-primary, etc.)
+    // 2. Nav/header background color — look for background-color on nav/header elements
+    // Pattern A: inline style on <nav> or <header> tags
+    const navInlineRe = /<(?:nav|header)[^>]*style=["'][^"']*background(?:-color)?\s*:\s*(#[0-9a-fA-F]{6})/gi;
+    let nm: RegExpExecArray | null;
+    while ((nm = navInlineRe.exec(html)) !== null) {
+      const hexVal = nm[1]!.toUpperCase();
+      const rr = parseInt(hexVal.slice(1, 3), 16);
+      const gg = parseInt(hexVal.slice(3, 5), 16);
+      const bb = parseInt(hexVal.slice(5, 7), 16);
+      const lum = (rr + gg + bb) / 3;
+      if (lum >= 20 && lum <= 235) {
+        if (!navColor) navColor = hexVal;
+        candidates.push(`nav-background: ${hexVal}`);
+        break;
+      }
+    }
+    // Pattern B: CSS rules for nav/header selectors
+    if (!navColor) {
+      const navCssRe = /(?:nav|header|#header|\.header|\.nav|\.navbar|\.site-header|\.global-nav|\.top-nav|\.main-nav)[^{]*\{[^}]*background(?:-color)?\s*:\s*(#[0-9a-fA-F]{6})/gi;
+      while ((nm = navCssRe.exec(html)) !== null) {
+        const hexVal = nm[1]!.toUpperCase();
+        const rr = parseInt(hexVal.slice(1, 3), 16);
+        const gg = parseInt(hexVal.slice(3, 5), 16);
+        const bb = parseInt(hexVal.slice(5, 7), 16);
+        const lum = (rr + gg + bb) / 3;
+        if (lum >= 20 && lum <= 235) {
+          if (!navColor) navColor = hexVal;
+          candidates.push(`nav-css-background: ${hexVal}`);
+          break;
+        }
+      }
+    }
+
+    // 3. CSS custom properties (--primary, --brand, --color-primary, etc.)
     const cssVarRe =
       /--(primary|brand|main|accent|corporate|key|base|highlight|secondary)[^:]*:\s*(#[0-9a-fA-F]{3,8}|rgb[a]?\([^)]+\))/gi;
     let m: RegExpExecArray | null;
     while ((m = cssVarRe.exec(html)) !== null) {
       candidates.push(`${m[1]}: ${m[2]}`);
+      if (!navColor && m[1] === "primary") navColor = m[2]!.trim();
       if (candidates.length >= 20) break;
     }
 
-    // 3. Hex colors appearing in style blocks / inline styles (most frequent first)
-    const hexRe = /#([0-9a-fA-F]{6})\b/g;
+    // 4. Hex colors appearing in style blocks / inline styles (most frequent first)
+    const hexRe = /#([0-9a-fA-F]{6})/g;
     const hexCounts: Record<string, number> = {};
     while ((m = hexRe.exec(html)) !== null) {
       const hex = `#${m[1].toUpperCase()}`;
-      // Skip near-white and near-black — they are rarely brand colors
       const r = parseInt(m[1].slice(0, 2), 16);
       const g = parseInt(m[1].slice(2, 4), 16);
       const b = parseInt(m[1].slice(4, 6), 16);
@@ -89,13 +122,82 @@ async function fetchBrandHints(url: string): Promise<string> {
       .slice(0, 15)
       .map(([hex, count]) => `${hex}(×${count})`);
     if (topHex.length) candidates.push(`frequent colors: ${topHex.join(", ")}`);
-
-    return candidates.slice(0, 30).join(" | ");
+    // If still no navColor, use the most frequent non-neutral color
+    if (!navColor && topHex.length > 0) {
+      navColor = topHex[0]!.split("(")[0]!;
+    }
+    return { hints: candidates.slice(0, 30).join(" | "), navColor };
   } catch {
-    return "";
+    return { hints: "", navColor: "" };
   }
 }
 
+
+// ─── Post-processing: enforce widget rules ────────────────────────────────────
+function postProcessMockHtml(html: string, brandData: {
+  primaryColor: string;
+  secondaryColor: string;
+  accentColor: string;
+  textColor: string;
+}): string {
+  let processed = html;
+
+  // Remove common profile/avatar widget patterns by class name
+  const avatarClasses = ['user-profile', 'profile-widget', 'avatar-widget', 'user-card', 'employee-card', 'profile-summary'];
+  for (const cls of avatarClasses) {
+    // Remove <div class="...{cls}...">...</div> blocks (non-greedy, single-line safe)
+    const openTag = new RegExp(`<div[^>]*class="[^"]*${cls}[^"]*"[^>]*>`, 'gi');
+    let match: RegExpExecArray | null;
+    while ((match = openTag.exec(processed)) !== null) {
+      const start = match.index;
+      let depth = 1;
+      let pos = start + match[0].length;
+      while (pos < processed.length && depth > 0) {
+        const nextOpen = processed.indexOf('<div', pos);
+        const nextClose = processed.indexOf('</div>', pos);
+        if (nextClose === -1) break;
+        if (nextOpen !== -1 && nextOpen < nextClose) {
+          depth++;
+          pos = nextOpen + 4;
+        } else {
+          depth--;
+          pos = nextClose + 6;
+        }
+      }
+      processed = processed.slice(0, start) + processed.slice(pos);
+      openTag.lastIndex = start;
+    }
+  }
+
+  // Inject 必読コンテンツ widget if not already present
+  if (!processed.includes('必読')) {
+    const widget = [
+      '<div data-widget="hissoku" style="background:#fff;border-radius:12px;padding:16px;margin-bottom:16px;box-shadow:0 1px 4px rgba(0,0,0,0.08);">',
+      `  <div style="font-size:13px;font-weight:700;color:${brandData.primaryColor};margin-bottom:12px;">必読コンテンツ</div>`,
+      '  <ul style="list-style:none;padding:0;margin:0;display:flex;flex-direction:column;gap:8px;">',
+      `    <li style="display:flex;align-items:flex-start;gap:8px;padding:8px;border-radius:8px;background:#f8f9fa;">`,
+      `      <span style="background:${brandData.primaryColor};color:#fff;font-size:10px;padding:2px 6px;border-radius:4px;white-space:nowrap;">重要</span>`,
+      `      <div><div style="font-size:12px;font-weight:600;color:${brandData.textColor};">2025年度 情報セキュリティ研修</div><div style="font-size:11px;color:#888;margin-top:2px;">期限: 2025年6月30日</div></div>`,
+      '    </li>',
+      `    <li style="display:flex;align-items:flex-start;gap:8px;padding:8px;border-radius:8px;background:#f8f9fa;">`,
+      `      <span style="background:${brandData.accentColor};color:#fff;font-size:10px;padding:2px 6px;border-radius:4px;white-space:nowrap;">必読</span>`,
+      `      <div><div style="font-size:12px;font-weight:600;color:${brandData.textColor};">行動規範・ハラスメント防止ガイドライン</div><div style="font-size:11px;color:#888;margin-top:2px;">期限: 2025年7月15日</div></div>`,
+      '    </li>',
+      `    <li style="display:flex;align-items:flex-start;gap:8px;padding:8px;border-radius:8px;background:#f8f9fa;">`,
+      `      <span style="background:#6c757d;color:#fff;font-size:10px;padding:2px 6px;border-radius:4px;white-space:nowrap;">確認</span>`,
+      `      <div><div style="font-size:12px;font-weight:600;color:${brandData.textColor};">個人情報保護方針 改定のお知らせ</div><div style="font-size:11px;color:#888;margin-top:2px;">期限: 2025年8月1日</div></div>`,
+      '    </li>',
+      '  </ul>',
+      '</div>',
+    ].join('\n');
+    if (processed.includes('</aside>')) {
+      processed = processed.replace('</aside>', widget + '\n    </aside>');
+    } else {
+      processed = processed.replace('</body>', widget + '\n</body>');
+    }
+  }
+  return processed;
+}
 // ─── Router ───────────────────────────────────────────────────────────────────
 
 export const appRouter = router({
@@ -115,10 +217,12 @@ export const appRouter = router({
       .input(brandExtractionSchema)
       .mutation(async ({ input }) => {
         // Step 1: fetch real color hints from the website
-        const brandHints = await fetchBrandHints(input.websiteUrl);
-
+        const { hints: brandHints, navColor: extractedNavColor } = await fetchBrandHints(input.websiteUrl);
+        const navColorNote = extractedNavColor
+          ? `\n\nNAV/HEADER BACKGROUND COLOR detected: ${extractedNavColor} — This MUST be used as primaryColor. It was found in the navigation or header element of the website.`
+          : "";
         const hintSection = brandHints
-          ? `\n\nACTUAL COLOR DATA extracted from ${input.websiteUrl}:\n${brandHints}\n\nUse these extracted colors as the primary source of truth for primaryColor and secondaryColor. Prefer the most frequently occurring non-neutral hex color as primaryColor.`
+          ? `\n\nACTUAL COLOR DATA extracted from ${input.websiteUrl}:\n${brandHints}${navColorNote}\n\nIMPORTANT: Use the nav-background color as primaryColor if available. Otherwise use the most frequently occurring non-neutral hex color.`
           : `\n\nNote: Could not fetch the website. Use your knowledge of this brand's well-known corporate colors.`;
 
         const prompt = `You are a brand analyst. Analyze the company "${input.companyName}" with website "${input.websiteUrl}".${hintSection}
@@ -199,6 +303,11 @@ Return ONLY valid JSON:
         const content = typeof rawContent === "string" ? rawContent : null;
         if (!content) throw new Error("No response from LLM");
         const parsed = JSON.parse(content);
+        // Deterministic override: if we extracted a nav/header color from the real website,
+        // force it as primaryColor regardless of what the LLM returned.
+        if (extractedNavColor) {
+          parsed.primaryColor = extractedNavColor;
+        }
         return brandDataSchema.parse(parsed);
       }),
 
@@ -256,7 +365,7 @@ Return ONLY valid JSON:
    b. 【ヒーローセクション】ブランドカラーのフルワイドグラデーションバナー、大きなウェルカム見出し（日本語）、タグライン、CTAボタン（日本語）
    c. 【ニュースフィード】3枚のニュースカード（カテゴリバッジ・タイトル・本文抜粋・日付・「続きを読む」リンク、すべて日本語）
    d. 【クイックリンク】4〜6個のアイコンタイル（SVGアイコン）：「人事ポータル」「ITヘルプ」「社内規程」「福利厚生」「社員名簿」「イベント」
-   e. 【サイドバー（デスクトップのみ）】「マイプロフィール」ウィジェット（CSSアバター・氏名・役職・部署）、「直近のイベント」リスト（2〜3件）、「社内統計」（アニメーション付きプログレスバー）
+   e. 【サイドバー（デスクトップのみ）】「必読コンテンツ」ウィジェット（重要度バッジ付き3件のリスト、未読マーク、タイトルと期限日）、「直近のイベント」リスト（2〜3件）、「社内統計」（アニメーション付きプログレスバー）
    f. 【ボトムナビゲーション（モバイルのみ）】5タブ（ホーム・ニュース・検索・社員・プロフィール）、SVGアイコン付き
 6. ブランドカラーを一貫して使用：プライマリーはナビ/ヒーロー、セカンダリーはカード/サイドバー、アクセントはCTA/バッジ/ハイライト。
 7. タイポグラフィ：指定フォントファミリーを使用。見出しは太字、本文は通常ウェイト。
@@ -296,7 +405,9 @@ Return ONLY valid JSON:
           throw new Error("Generated HTML is too short. Please try again.");
         }
 
-        return { html: cleaned };
+        // Post-process: remove profile/avatar widgets and inject 必読コンテンツ if missing
+        const processedHtml = postProcessMockHtml(cleaned, brandData);
+        return { html: processedHtml };
       }),
 
     // ── AI image prompt generation ─────────────────────────────────────────
@@ -308,33 +419,26 @@ Return ONLY valid JSON:
       }))
       .mutation(async ({ input }) => {
         const { companyName, websiteUrl, brandData } = input;
-        const promptInstruction = `あなたはAI画像生成プロンプトの専門家です。以下の企業情報をもとに、他のAIツール（Midjourney、DALL-E、Stable Diffusionなど）で高品質な企業イントラネットUI画像を生成するための、詳細で具体的な日本語プロンプトを作成してください。
+        const promptInstruction = `あなたはStable Diffusion向けAI画像生成プロンプトの専門家です。以下の企業情報をもとに、Stable Diffusionで高品質な企業イントラネットUI画像を生成するための、詳細で具体的な日本語プロンプトを作成してください。
 
 【企業情報】
 - 企業名: ${companyName}
 - 公式サイト: ${websiteUrl}
 - 業界: ${brandData.industry}
 - ブランドトーン: ${brandData.brandTone}
-- プライマリーカラー: ${brandData.primaryColor}
+- プライマリーカラー（ナビゲーション色）: ${brandData.primaryColor}
 - セカンダリーカラー: ${brandData.secondaryColor}
 - アクセントカラー: ${brandData.accentColor}
 - タグライン: ${brandData.tagline}
 
-以下の固定プロンプトに続けて使える、企業固有の追加指示を作成してください。
+以下の4セクション構成でプロンプトを作成してください。各セクションは「①レイアウト」「②ブランド」「③ビジュアル」「④品質」の見出しで始めること。
 
-固定プロンプト（先頭に付く）:
----
-あなたは企業イントラネットUIデザインの専門家です。ユーザーから提供されるモック画像をベースに、本物の企業ロゴと適切な実写画像を組み込んで、完成度の高い企業イントラネット画像を作成します。
----
+①レイアウト: 画面構成・UI要素の配置を具体的に記述（ナビゲーションバー、ヒーローバナー、ニュースカード、サイドバー、ボトムナビなど）
+②ブランド: ${companyName}の公式ロゴの特徴（色・形状・フォント）、ブランドカラー${brandData.primaryColor}の使用箇所、${brandData.industry}らしいビジュアル表現
+③ビジュアル: ヒーローバナーの背景画像の内容（${brandData.industry}・${brandData.brandTone}に合わせた実写イメージ）、ニュースカードのサムネイル画像の内容指示、全体的な雰囲気・トーン
+④品質: Stable Diffusionで高品質出力を得るための技術的指定（解像度、スタイル、レンダリング品質など）
 
-企業固有の追加指示として以下を含めてください:
-1. ${companyName}の公式ロゴの特徴（色、形状、フォントスタイル）
-2. ブランドカラーの具体的な使用指示（${brandData.primaryColor}をナビゲーションに、など）
-3. 業界（${brandData.industry}）に適したニュース画像・バナー画像の内容指示
-4. ヒーローバナーの背景画像の具体的な内容（業界・ブランドトーンに合わせて）
-5. 全体的なデザインの雰囲気・トーン指示
-
-出力形式: 日本語で、すぐにAIツールに貼り付けられる形式のプロンプトテキストのみを返してください。`;
+出力形式: 日本語で、すぐにStable Diffusionに貼り付けられる形式のプロンプトテキストのみを返してください。セクション見出し（①〜④）を含めること。`;
 
         const response = await invokeLLM({
           messages: [
