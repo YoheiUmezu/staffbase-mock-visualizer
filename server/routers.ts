@@ -203,6 +203,45 @@ function postProcessMockHtml(html: string, brandData: {
   const statsHideRule = `\n  /* Post-processor: hide 社内統計 and progress bar widgets globally */\n  [class*="stats"], [class*="statistic"], [class*="progress-widget"],\n  [class*="stat-widget"], [class*="company-stats"], [class*="social-stat"] { display: none !important; }\n`;
   processed = processed.replace('</style>', statsHideRule + '</style>');
 
+  // ── Ensure コミュニティ section exists ───────────────────────────────────────
+  // If the LLM omitted the community section, inject a placeholder
+  const hasCommunity = processed.includes('コミュニティ') && (
+    processed.includes('community') || processed.includes('参加する') || processed.includes('参加中')
+  );
+  if (!hasCommunity) {
+    const communityPlaceholder = `
+<section style="padding:2rem;background:#f8f9fa;">
+  <h2 style="font-size:1.4rem;font-weight:700;margin-bottom:1.5rem;">コミュニティ</h2>
+  <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:1rem;">
+    <div style="background:#fff;border-radius:12px;overflow:hidden;box-shadow:0 2px 8px rgba(0,0,0,.08);">
+      <img alt="corporate team collaboration meeting, professional photography, natural office lighting, wide angle shot" style="width:100%;height:120px;object-fit:cover;background:#e0e0e0;display:block;" src="">
+      <div style="padding:1rem;">
+        <div style="font-weight:600;margin-bottom:.4rem;">社内DX推進</div>
+        <div style="font-size:.8rem;color:#666;">128メンバー</div>
+        <button style="margin-top:.8rem;padding:.4rem .8rem;border-radius:6px;border:none;background:${brandData.primaryColor};color:#fff;font-size:.8rem;cursor:pointer;">参加する</button>
+      </div>
+    </div>
+    <div style="background:#fff;border-radius:12px;overflow:hidden;box-shadow:0 2px 8px rgba(0,0,0,.08);">
+      <img alt="business strategy planning session, modern office environment, soft ambient lighting, medium shot" style="width:100%;height:120px;object-fit:cover;background:#e0e0e0;display:block;" src="">
+      <div style="padding:1rem;">
+        <div style="font-weight:600;margin-bottom:.4rem;">品質改善チーム</div>
+        <div style="font-size:.8rem;color:#666;">64メンバー</div>
+        <button style="margin-top:.8rem;padding:.4rem .8rem;border-radius:6px;border:none;background:${brandData.primaryColor};color:#fff;font-size:.8rem;cursor:pointer;">参加する</button>
+      </div>
+    </div>
+    <div style="background:#fff;border-radius:12px;overflow:hidden;box-shadow:0 2px 8px rgba(0,0,0,.08);">
+      <img alt="workplace safety training workshop, industrial setting, bright overhead lighting, group activity" style="width:100%;height:120px;object-fit:cover;background:#e0e0e0;display:block;" src="">
+      <div style="padding:1rem;">
+        <div style="font-weight:600;margin-bottom:.4rem;">健康・ウェルネス</div>
+        <div style="font-size:.8rem;color:#666;">92メンバー</div>
+        <button style="margin-top:.8rem;padding:.4rem .8rem;border-radius:6px;border:none;background:${brandData.primaryColor};color:#fff;font-size:.8rem;cursor:pointer;">参加中</button>
+      </div>
+    </div>
+  </div>
+</section>`;
+    processed = processed.replace('</body>', communityPlaceholder + '\n</body>');
+  }
+
   // ── Enforce bottom-nav desktop hide ───────────────────────────────────────
   // If the LLM generated a bottom-nav without proper media query hiding,
   // inject a CSS rule to ensure it is hidden on desktop..
@@ -457,8 +496,7 @@ Return ONLY valid JSON:
       - ナビリンク（ホーム・ニュース・ナレッジ・社員・イベント）
       - ユーザーアバター（CSSサークル＋イニシャル）
       - 通知ベルアイコン（SVG）
-   b. 【ヒーローセクション】ブランドカラーのフルワイドグラデーションバナー（最低200px高さ）、大きなウェルカム見出し（日本語）、タグライン、CTAボタン（日本語）、装飾的なSVG幾何学シェイプを最低2つ含めること。
-   c. 【ニュースフィード】3枚のニュースカード。各カードには: サムネイル<img>（上記ルール2に従う）、カテゴリバッジ、タイトル（15文字以上）、本文抜粋（40文字以上）、日付、「続きを読む」リンク。すべて日本語。
+   b. 【ヒーローセクション】ブランドカラーのフルワイドグラデーションバナー（最低200px高さ）、大きなウェルカム見出し（日本語）、タグライン、CTAボタン（日本語）、装飾的なSVG幾何学シェイプを最低2つ含めること。   c. 【ニュースフィード〃3枚のニュースカード。各カードには以下を必ず含めること: サムネイル<img>（上記ルール2に従う）、カテゴリーバッジ（色付き）、タイトル（20文字以上）、本文抜粋（60文字以上、具体的な内容）、著者名、日付、「続きを読む」リンク。カード内に空白エリアを作らないこと。すべて日本語。
    d. 【クイックリンク】6個のアイコンタイル（SVGアイコン付き）：「人事ポータル」「ITヘルプデスク」「社内規程・ポリシー」「福利厚生」「社員名簿」「社内イベント」。各タイルにはアイコンとラベルを含めること。
    e. 【サイドバー（デスクトップのみ）〃3つのウィジェットを必ず含めること: (1)「必読コンテンツ」ウィジェット（重要度バッジ付き3件）、(2)「直近のイベント」リスト（3件、日付・タイトル・場所付き）、(3)「お知らせ・アナウンス」ウィジェット（3件、各件に優先度バッジ・タイトル・日付付き）。社内統計やプログレスバーは一切含めないこと。このサイドバーは @media (max-width: 768px) では display:none にすること（モバイルでは非表示）。
    f. 【ボトムナビゲーション（モバイルのみ）】@media (max-width: 768px) のみで表示。5タブ（ホーム・ニュース・検索・社員・プロフィール）、SVGアイコン付き。CSSは以下を厳守すること:
@@ -470,7 +508,14 @@ Return ONLY valid JSON:
 11. デザインは洗練されたエンタープライズ品質で、${companyName}のブランドらしさが伝わること。
 12. モバイル表示では、ボトムナビゲーションが固定されるため、コンテンツエリアに padding-bottom: 70px を設定すること。
 13. 【モバイルレイアウト厳守】@media (max-width: 768px) では、すべてのコンテンツセクション（ニュースカード、クイックリンク、コミュニティ等）を1列1アイテムで表示すること。グリッドは grid-template-columns: 1fr のみ使用。横並びレイアウトは禁止。
-14. 【コミュニティセクション（デスクトップ・モバイル両方に表示）】${companyName}の業界・業種に合わせた社内コミュニティグループを4〜6個表示すること。各コミュニティには: グループアイコン（SVG）、グループ名（日本語）、メンバー数、最新投稿の抜粋（1行）、「参加する」または「参加中」ボタンを含めること。グループ名は${industry}業界に実際にありそうな社内コミュニティ名にすること（例: 製造業なら「品質改善チーム」「DX推進グループ」「安全衛生委員会」など）。デスクトップでは2〜3列グリッド、モバイルでは1列表示。
+14. 【コミュニティセクション（デスクトップ・モバイル両方に表示）《セクションタイトルは「コミュニティ」とすること。${companyName}の業界・業種に合わせた社内コミュニティグループを少なくとも6個表示すること。各コミュニティカードには必ず含めること:
+    - サムネイル<img>（以下の形式で）:
+      <img alt="[Flux image generation prompt for community thumbnail]" style="width:100%;height:120px;object-fit:cover;border-radius:8px 8px 0 0;background:#e0e0e0;display:block;" src="">
+      altの内容は、そのコミュニティのテーマに合ったFLUX.1向け英語プロンプト（Subject/Style/Lighting/Compositionの4要素）にすること
+    - グループアイコン（SVG）、グループ名（日本語）、メンバー数、最新投稿の抜粋（1行）、「参加する」または「参加中」ボタン
+    - グループ名は${industry}業界に実際にありそうな社内コミュニティ名にすること（例: 製造業なら「品質改善チーム」「DX推進グループ」「安全衛生委員会」など）
+    - デスクトップでは2、3列グリッド、モバイルでは1列表示
+    - カード内に空白エリアを作らないこと
 出力: <!DOCTYPE html>から始まる完全なHTMLファイルのみを返すこと。マークダウンのコードフェンス不要、説明文不要。`;
 
         const response = await invokeLLM({
