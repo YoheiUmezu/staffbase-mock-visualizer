@@ -215,6 +215,21 @@ function postProcessMockHtml(html: string, brandData: {
     }
   }
 
+  // ── Enforce bottom-nav full-width fix ───────────────────────────────────────
+  // Inject CSS to ensure bottom nav spans full width correctly
+  for (const cls of bottomNavPatterns) {
+    if (processed.includes(cls)) {
+      const widthFixRule = `\n  /* Post-processor: bottom nav full-width fix */\n  @media (max-width: 768px) { .${cls} { left: 0 !important; right: 0 !important; width: 100% !important; box-sizing: border-box !important; } .${cls} > * { flex: 1 !important; } }\n`;
+      processed = processed.replace('</style>', widthFixRule + '</style>');
+      break;
+    }
+  }
+
+  // ── Enforce mobile single-column layout + sidebar hide + bottom nav full width ──
+  // Broad CSS injection that covers all possible LLM-generated class names
+  const mobileOverrideRule = `\n  /* Post-processor: mobile layout overrides */\n  @media (max-width: 768px) {\n    /* Single-column for all grid/flex content sections */\n    [class*="grid"] { grid-template-columns: 1fr !important; }\n    [class*="card-grid"] { grid-template-columns: 1fr !important; }\n    [class*="news"][class*="grid"], [class*="news"][class*="feed"] { grid-template-columns: 1fr !important; }\n    [class*="quick"][class*="link"] { grid-template-columns: repeat(2, 1fr) !important; }\n    [class*="community"][class*="grid"] { grid-template-columns: 1fr !important; }\n    /* Hide sidebar and 社内統計 on mobile */\n    aside, [class*="sidebar"], [class*="side-bar"], [class*="side_bar"] { display: none !important; }\n    [class*="stats"], [class*="statistic"], [class*="progress-widget"] { display: none !important; }\n    /* Bottom nav full-width fix — covers all possible class names */\n    [class*="bottom"][class*="nav"], [class*="tab"][class*="bar"], [class*="mobile"][class*="nav"] {\n      left: 0 !important; right: 0 !important; width: 100% !important;\n      box-sizing: border-box !important; display: flex !important;\n      flex-direction: row !important; justify-content: space-around !important;\n    }\n    [class*="bottom"][class*="nav"] > *, [class*="tab"][class*="bar"] > * { flex: 1 !important; text-align: center !important; }\n  }\n`;
+  processed = processed.replace('</style>', mobileOverrideRule + '</style>');
+
   // ── Ensure each news card has an <img> placeholder ─────────────────────────
   // Count existing <img> tags in news card areas
   const imgCount = (processed.match(/<img\s/gi) || []).length;
@@ -440,13 +455,17 @@ Return ONLY valid JSON:
    b. 【ヒーローセクション】ブランドカラーのフルワイドグラデーションバナー（最低200px高さ）、大きなウェルカム見出し（日本語）、タグライン、CTAボタン（日本語）、装飾的なSVG幾何学シェイプを最低2つ含めること。
    c. 【ニュースフィード】3枚のニュースカード。各カードには: サムネイル<img>（上記ルール2に従う）、カテゴリバッジ、タイトル（15文字以上）、本文抜粋（40文字以上）、日付、「続きを読む」リンク。すべて日本語。
    d. 【クイックリンク】6個のアイコンタイル（SVGアイコン付き）：「人事ポータル」「ITヘルプデスク」「社内規程・ポリシー」「福利厚生」「社員名簿」「社内イベント」。各タイルにはアイコンとラベルを含めること。
-   e. 【サイドバー（デスクトップのみ）】3つのウィジェットを必ず含めること: (1)「必読コンテンツ」ウィジェット（重要度バッジ付き3件）、(2)「直近のイベント」リスト（3件、日付・タイトル・場所付き）、(3)「社内統計」（3本のプログレスバー、数値ラベル付き）。
-   f. 【ボトムナビゲーション（モバイルのみ）】@media (max-width: 768px) のみで表示。5タブ（ホーム・ニュース・検索・社員・プロフィール）、SVGアイコン付き、position:fixed、bottom:0。デスクトップでは display:none にすること。
+   e. 【サイドバー（デスクトップのみ）】3つのウィジェットを必ず含めること: (1)「必読コンテンツ」ウィジェット（重要度バッジ付き3件）、(2)「直近のイベント」リスト（3件、日付・タイトル・場所付き）、(3)「社内統計」（3本のプログレスバー、数値ラベル付き）。このサイドバーは @media (max-width: 768px) では display:none にすること（モバイルでは非表示）。
+   f. 【ボトムナビゲーション（モバイルのみ）】@media (max-width: 768px) のみで表示。5タブ（ホーム・ニュース・検索・社員・プロフィール）、SVGアイコン付き。CSSは以下を厳守すること:
+      position: fixed; bottom: 0; left: 0; right: 0; width: 100%; box-sizing: border-box; display: flex; flex-direction: row; justify-content: space-around; align-items: center;
+      各タブは flex: 1; text-align: center; にすること。デスクトップでは display:none にすること。
 8. ブランドカラーを一貫して使用：プライマリーはナビ/ヒーロー、セカンダリーはカード/サイドバー、アクセントはCTA/バッジ/ハイライト。
 9. タイポグラフィ：指定フォントファミリーを使用。見出しは太字、本文は通常ウェイト。
 10. 細部へのこだわり：カードのホバー状態（translateY＋シャドウ）、スムーズなトランジション、繊細なグラデーション、プロフェッショナルな余白。
 11. デザインは洗練されたエンタープライズ品質で、${companyName}のブランドらしさが伝わること。
 12. モバイル表示では、ボトムナビゲーションが固定されるため、コンテンツエリアに padding-bottom: 70px を設定すること。
+13. 【モバイルレイアウト厳守】@media (max-width: 768px) では、すべてのコンテンツセクション（ニュースカード、クイックリンク、コミュニティ等）を1列1アイテムで表示すること。グリッドは grid-template-columns: 1fr のみ使用。横並びレイアウトは禁止。
+14. 【コミュニティセクション（デスクトップ・モバイル両方に表示）】${companyName}の業界・業種に合わせた社内コミュニティグループを4〜6個表示すること。各コミュニティには: グループアイコン（SVG）、グループ名（日本語）、メンバー数、最新投稿の抜粋（1行）、「参加する」または「参加中」ボタンを含めること。グループ名は${industry}業界に実際にありそうな社内コミュニティ名にすること（例: 製造業なら「品質改善チーム」「DX推進グループ」「安全衛生委員会」など）。デスクトップでは2〜3列グリッド、モバイルでは1列表示。
 出力: <!DOCTYPE html>から始まる完全なHTMLファイルのみを返すこと。マークダウンのコードフェンス不要、説明文不要。`;
 
         const response = await invokeLLM({

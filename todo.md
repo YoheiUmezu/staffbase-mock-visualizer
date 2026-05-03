@@ -42,3 +42,9 @@
 - [x] News card img alt: rewrite to Flux-optimized prompt format (subject, style, lighting, composition — no resolution tags)
 - [x] Nav logo: add <img alt="[Flux logo recreation prompt]"> in the navigation bar logo area with company-specific logo description
 - [x] Both alt prompts must be in English and immediately usable in Cursor + Flux
+
+## Bug Fixes (Round 7)
+- [x] Mobile layout: all content sections display as single column (1 item per row) on mobile
+- [x] Mobile bottom nav: fix width so it spans full screen width without breaking
+- [x] Mobile: remove 社内統計 (progress bar widget) from mobile layout
+- [x] Desktop + Mobile: add company-specific community section (groups/channels relevant to the company's industry)
