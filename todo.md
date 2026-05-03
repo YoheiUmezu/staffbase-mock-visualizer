@@ -55,3 +55,9 @@
 - [x] Community cards: each has a thumbnail <img alt="[Flux prompt]"> at appropriate position
 
 ## Bug Fixes (Round 8b — Urgent)- [x] Remove 社内統計 widget from desktop sidebar; replace with 「お知らせ・アナウンス」 widget (3 items with priority badge, title, date)
+
+## Round 9
+- [x] Input form: add 業種 text input field
+- [x] Input form: add ブランドトーン selector (先進的 / 堅実 / 高級感) as radio buttons or select
+- [x] tRPC: pass industry and brandTone from extractBrand and generateMock input schemas
+- [x] LLM prompt: use industry and brandTone to influence mock style and community group names

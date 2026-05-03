@@ -389,6 +389,8 @@ function AiPromptPanel({
 export default function Home() {
   const [companyName, setCompanyName] = useState("");
   const [websiteUrl, setWebsiteUrl] = useState("");
+  const [industry, setIndustry] = useState("");
+  const [brandTone, setBrandTone] = useState("");
   const [step, setStep] = useState<Step>("idle");
   const [brandData, setBrandData] = useState<BrandData | null>(null);
   const [mockHtml, setMockHtml] = useState<string | null>(null);
@@ -416,7 +418,7 @@ export default function Home() {
   const generateMock = trpc.mock.generateMock.useMutation();
   const generateImagePromptMutation = trpc.mock.generateImagePrompt.useMutation();
 
-  const handleGenerate = useCallback(async (name: string, url: string) => {
+  const handleGenerate = useCallback(async (name: string, url: string, ind: string, tone: string) => {
     if (!name.trim() || !url.trim()) {
       toast.error("企業名とURLを入力してください。");
       return;
@@ -429,7 +431,12 @@ export default function Home() {
     setBrandData(null);
     setMockHtml(null);
     try {
-      const brand = await extractBrand.mutateAsync({ companyName: name, websiteUrl: url });
+      const brand = await extractBrand.mutateAsync({
+        companyName: name,
+        websiteUrl: url,
+        ...(ind.trim() ? { industry: ind.trim() } : {}),
+        ...(tone ? { brandTone: tone } : {}),
+      });
       setBrandData(brand);
       setStep("generating");
       const result = await generateMock.mutateAsync({ companyName: name, brandData: brand });
@@ -448,12 +455,14 @@ export default function Home() {
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    handleGenerate(companyName, websiteUrl);
+    handleGenerate(companyName, websiteUrl, industry, brandTone);
   };
-  const handleRegenerate = () => handleGenerate(companyName, websiteUrl);
+  const handleRegenerate = () => handleGenerate(companyName, websiteUrl, industry, brandTone);
   const handleReset = () => {
     setCompanyName("");
     setWebsiteUrl("");
+    setIndustry("");
+    setBrandTone("");
     setStep("idle");
     setBrandData(null);
     setMockHtml(null);
@@ -558,6 +567,53 @@ export default function Home() {
                   onChange={e => setWebsiteUrl(e.target.value)}
                   className="h-11"
                 />
+              </div>
+              {/* Industry input */}
+              <div className="space-y-1.5">
+                <Label htmlFor="industry" className="text-xs font-semibold text-muted-foreground uppercase tracking-wider flex items-center gap-1.5">
+                  <Building2 className="w-3.5 h-3.5" />
+                  業種
+                  <span className="normal-case font-normal text-muted-foreground/60">(任意)</span>
+                </Label>
+                <Input
+                  id="industry"
+                  placeholder="例: 製造業、金融・保険、小売業、IT・テクノロジー"
+                  value={industry}
+                  onChange={e => setIndustry(e.target.value)}
+                  className="h-11"
+                />
+              </div>
+              {/* Brand tone selector */}
+              <div className="space-y-2">
+                <Label className="text-xs font-semibold text-muted-foreground uppercase tracking-wider flex items-center gap-1.5">
+                  <Sparkles className="w-3.5 h-3.5" />
+                  ブランドトーン
+                  <span className="normal-case font-normal text-muted-foreground/60">(任意)</span>
+                </Label>
+                <div className="grid grid-cols-3 gap-2">
+                  {[
+                    { value: "innovative", label: "先進的" },
+                    { value: "trustworthy", label: "堅実" },
+                    { value: "premium", label: "高級感" },
+                    { value: "friendly", label: "親しみ" },
+                    { value: "energetic", label: "アクティブ" },
+                    { value: "professional", label: "プロフェッショナル" },
+                  ].map(({ value, label }) => (
+                    <button
+                      key={value}
+                      type="button"
+                      onClick={() => setBrandTone(prev => prev === value ? "" : value)}
+                      className={[
+                        "h-9 rounded-lg border text-xs font-medium transition-all",
+                        brandTone === value
+                          ? "bg-primary text-primary-foreground border-primary shadow-sm"
+                          : "bg-background border-border/60 text-muted-foreground hover:border-primary/40 hover:text-foreground"
+                      ].join(" ")}
+                    >
+                      {label}
+                    </button>
+                  ))}
+                </div>
               </div>
               <Button
                 type="submit"

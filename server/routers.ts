@@ -10,6 +10,8 @@ import { z } from "zod";
 const brandExtractionSchema = z.object({
   companyName: z.string().min(1),
   websiteUrl: z.string().url(),
+  industry: z.string().optional(),   // user-provided override
+  brandTone: z.string().optional(),  // user-provided override
 });
 
 const brandDataSchema = z.object({
@@ -423,6 +425,9 @@ Return ONLY valid JSON:
         if (extractedNavColor) {
           parsed.primaryColor = extractedNavColor;
         }
+        // User-provided overrides take precedence over LLM inference
+        if (input.industry) parsed.industry = input.industry;
+        if (input.brandTone) parsed.brandTone = input.brandTone;
         return brandDataSchema.parse(parsed);
       }),
 
