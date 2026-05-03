@@ -244,37 +244,133 @@ function postProcessMockHtml(html: string, brandData: {
     processed = processed.replace('</body>', communityPlaceholder + '\n</body>');
   }
 
-  // ── Enforce bottom-nav desktop hide ───────────────────────────────────────
-  // If the LLM generated a bottom-nav without proper media query hiding,
-  // inject a CSS rule to ensure it is hidden on desktop..
+  // ── Enforce bottom-nav: always visible in mobile iframe, hidden on desktop ──
+  // The iframe renders at 390px so @media (max-width: 768px) is always active.
+  // However, LLM often sets `.bottom-nav { display: none }` as default and only
+  // enables it inside the media query — which can be overridden by specificity.
+  // Fix: unconditionally force the bottom nav to display:flex and hide on desktop.
   const bottomNavPatterns = ['bottom-nav', 'bottom-navigation', 'tab-bar', 'mobile-nav', 'mobile-bottom'];
   for (const cls of bottomNavPatterns) {
     if (processed.includes(cls)) {
-      // Check if a display:none rule for desktop already exists
-      const desktopHidePattern = new RegExp(`@media[^{]*min-width[^{]*{[^}]*\\.${cls}[^}]*display\\s*:\\s*none`, 'i');
-      if (!desktopHidePattern.test(processed)) {
-        // Inject a CSS rule before </style> to hide on desktop
-        const hideRule = `\n  /* Post-processor: hide bottom nav on desktop */\n  @media (min-width: 769px) { .${cls} { display: none !important; } }\n`;
-        processed = processed.replace('</style>', hideRule + '</style>');
-      }
-      break;
-    }
+      // Inject a high-specificity rule that:
+      // 1. Forces bottom nav visible as flex by default
+      // 2. Hides it only on desktop (min-width: 769px)
+      // 3. Fixes width and alignment for all child elements
+      const bottomNavFixRule = `
+  /* Post-processor: bottom nav forced visible + layout fix */
+  .${cls} {
+    display: flex !important;
+    flex-direction: row !important;
+    position: fixed !important;
+    bottom: 0 !important;
+    left: 0 !important;
+    right: 0 !important;
+    width: 100% !important;
+    box-sizing: border-box !important;
+    justify-content: space-around !important;
+    align-items: center !important;
+    padding: 0 !important;
+    margin: 0 !important;
+    z-index: 1000 !important;
+    min-height: 56px !important;
   }
-
-  // ── Enforce bottom-nav full-width fix ───────────────────────────────────────
-  // Inject CSS to ensure bottom nav spans full width correctly
-  for (const cls of bottomNavPatterns) {
-    if (processed.includes(cls)) {
-      const widthFixRule = `\n  /* Post-processor: bottom nav full-width fix */\n  @media (max-width: 768px) { .${cls} { left: 0 !important; right: 0 !important; width: 100% !important; box-sizing: border-box !important; } .${cls} > * { flex: 1 !important; } }\n`;
-      processed = processed.replace('</style>', widthFixRule + '</style>');
+  @media (min-width: 769px) {
+    .${cls} { display: none !important; }
+  }
+  /* bottom-nav-inner: must also be flex row to avoid column stacking */
+  .${cls}-inner, .${cls} > div {
+    display: flex !important;
+    flex-direction: row !important;
+    width: 100% !important;
+    justify-content: space-around !important;
+    align-items: center !important;
+    height: 56px !important;
+  }
+  .${cls}-item, .${cls} a, .${cls} button {
+    position: static !important;
+    flex: 1 1 0% !important;
+    width: auto !important;
+    max-width: none !important;
+    min-width: 0 !important;
+    text-align: center !important;
+    display: flex !important;
+    flex-direction: column !important;
+    align-items: center !important;
+    justify-content: center !important;
+    overflow: hidden !important;
+    padding: 4px 0 !important;
+    font-size: 0.7em !important;
+    text-decoration: none !important;
+  }
+  .${cls}-item svg, .${cls} a svg, .${cls} button svg {
+    width: 22px !important;
+    height: 22px !important;
+    flex-shrink: 0 !important;
+    margin-bottom: 2px !important;
+  }
+`;
+      processed = processed.replace('</style>', bottomNavFixRule + '</style>');
       break;
     }
   }
 
   // ── Enforce mobile single-column layout + sidebar hide + bottom nav full width ──
   // Broad CSS injection that covers all possible LLM-generated class names
-  const mobileOverrideRule = `\n  /* Post-processor: global layout overrides */\n  /* Full-width sections: quick links and community always span full page width */\n  [class*="quick"][class*="link"], [class*="quick-link"], [class*="quicklink"],\n  [class*="community"][class*="section"], [class*="community-section"] {\n    width: 100% !important; max-width: 100% !important;\n    grid-column: 1 / -1 !important; margin-left: 0 !important; margin-right: 0 !important;\n  }\n  /* Desktop: quick links 6-col, community 3-col */\n  @media (min-width: 769px) {\n    [class*="quick"][class*="grid"], [class*="quick"][class*="link"][class*="grid"] { grid-template-columns: repeat(6, 1fr) !important; }\n    [class*="community"][class*="grid"] { grid-template-columns: repeat(3, 1fr) !important; }\n    /* News cards: 2x2 grid on desktop */\n    [class*="news"][class*="grid"], [class*="news"][class*="feed"] { grid-template-columns: repeat(2, 1fr) !important; }\n  }\n  @media (max-width: 768px) {\n    /* Single-column for all grid/flex content sections */\n    [class*="grid"] { grid-template-columns: 1fr !important; }\n    [class*="card-grid"] { grid-template-columns: 1fr !important; }\n    [class*="news"][class*="grid"], [class*="news"][class*="feed"] { grid-template-columns: 1fr !important; }\n    [class*="quick"][class*="link"] { grid-template-columns: repeat(3, 1fr) !important; }\n    [class*="community"][class*="grid"] { grid-template-columns: 1fr !important; }\n    /* Hide sidebar and \u793e\u5185\u7d71\u8a08 on mobile */\n    aside, [class*="sidebar"], [class*="side-bar"], [class*="side_bar"] { display: none !important; }\n    [class*="stats"], [class*="statistic"], [class*="progress-widget"] { display: none !important; }\n    /* Bottom nav full-width fix \u2014 covers all possible class names */\n    [class*="bottom"][class*="nav"], [class*="tab"][class*="bar"], [class*="mobile"][class*="nav"] {\n      position: fixed !important; bottom: 0 !important; left: 0 !important; right: 0 !important;\n      width: 100% !important; box-sizing: border-box !important;\n      display: flex !important; flex-direction: row !important;\n      justify-content: space-around !important; align-items: center !important;\n      padding: 0 !important; margin: 0 !important; overflow: hidden !important;\n    }\n    [class*="bottom"][class*="nav"] > *, [class*="tab"][class*="bar"] > *,\n    [class*="mobile"][class*="nav"] > * {\n      flex: 1 !important; text-align: center !important;\n      min-width: 0 !important; overflow: hidden !important;\n      display: flex !important; flex-direction: column !important;\n      align-items: center !important; justify-content: center !important;\n    }\n    [class*="bottom"][class*="nav"] svg, [class*="tab"][class*="bar"] svg,\n    [class*="mobile"][class*="nav"] svg {\n      flex-shrink: 0 !important; width: 20px !important; height: 20px !important;\n    }\n  }
-`;
+  const mobileOverrideRule = [
+    '\n  /* Post-processor: global layout overrides */',
+    '  /* Full-width sections: quick links and community always span full page width */',
+    '  [class*="quick"][class*="link"], [class*="quick-link"], [class*="quicklink"],',
+    '  [class*="community"][class*="section"], [class*="community-section"] {',
+    '    width: 100% !important; max-width: 100% !important;',
+    '    grid-column: 1 / -1 !important; margin-left: 0 !important; margin-right: 0 !important;',
+    '  }',
+    '  /* Desktop: quick links 6-col, community 3-col */',
+    '  @media (min-width: 769px) {',
+    '    [class*="quick"][class*="grid"], [class*="quick"][class*="link"][class*="grid"] { grid-template-columns: repeat(6, 1fr) !important; }',
+    '    [class*="community"][class*="grid"] { grid-template-columns: repeat(3, 1fr) !important; }',
+    '    [class*="news"][class*="grid"], [class*="news"][class*="feed"] { grid-template-columns: repeat(2, 1fr) !important; }',
+    '  }',
+    '  @media (max-width: 768px) {',
+    '    [class*="grid"] { grid-template-columns: 1fr !important; }',
+    '    [class*="card-grid"] { grid-template-columns: 1fr !important; }',
+    '    [class*="news"][class*="grid"], [class*="news"][class*="feed"] { grid-template-columns: 1fr !important; }',
+    '    [class*="quick"][class*="link"] { grid-template-columns: repeat(3, 1fr) !important; }',
+    '    [class*="community"][class*="grid"] { grid-template-columns: 1fr !important; }',
+    '    aside, [class*="sidebar"], [class*="side-bar"], [class*="side_bar"] { display: none !important; }',
+    '    [class*="stats"], [class*="statistic"], [class*="progress-widget"] { display: none !important; }',
+    '    /* Bottom nav: force row layout, full width, fixed at bottom */',
+    '    [class*="bottom"][class*="nav"], [class*="tab"][class*="bar"], [class*="mobile"][class*="nav"] {',
+    '      position: fixed !important; bottom: 0 !important; left: 0 !important; right: 0 !important;',
+    '      width: 100% !important; box-sizing: border-box !important;',
+    '      display: flex !important; flex-direction: row !important;',
+    '      justify-content: space-around !important; align-items: center !important;',
+    '      padding: 0 !important; margin: 0 !important; overflow: hidden !important;',
+    '      min-height: 56px !important;',
+    '    }',
+    '    /* Inner wrapper div: must be row */',
+    '    [class*="bottom"][class*="nav"] > div, [class*="tab"][class*="bar"] > div {',
+    '      display: flex !important; flex-direction: row !important; width: 100% !important;',
+    '      justify-content: space-around !important; align-items: center !important;',
+    '    }',
+    '    /* Nav items (a/button): column layout for icon + label, auto width */',
+    '    [class*="bottom"][class*="nav"] a, [class*="bottom"][class*="nav"] button,',
+    '    [class*="tab"][class*="bar"] a, [class*="tab"][class*="bar"] button,',
+    '    [class*="mobile"][class*="nav"] a, [class*="mobile"][class*="nav"] button {',
+    '      position: static !important;',
+    '      flex: 1 1 0% !important; width: auto !important; max-width: none !important;',
+    '      min-width: 0 !important; overflow: hidden !important;',
+    '      display: flex !important; flex-direction: column !important;',
+    '      align-items: center !important; justify-content: center !important;',
+    '      padding: 4px 0 !important; font-size: 0.7em !important;',
+    '    }',
+    '    [class*="bottom"][class*="nav"] svg, [class*="tab"][class*="bar"] svg,',
+    '    [class*="mobile"][class*="nav"] svg {',
+    '      flex-shrink: 0 !important; width: 22px !important; height: 22px !important;',
+    '      margin-bottom: 2px !important;',
+    '    }',
+    '  }',
+    '\n',
+  ].join('\n');
   processed = processed.replace('</style>', mobileOverrideRule + '</style>');
 
   // ── Ensure each news card has an <img> placeholder ─────────────────────────
@@ -502,12 +598,17 @@ Return ONLY valid JSON:
       - ナビリンク（ホーム・ニュース・ナレッジ・社員・イベント）
       - ユーザーアバター（CSSサークル＋イニシャル）
       - 通知ベルアイコン（SVG）
-   b. 【ヒーローセクション】ブランドカラーのフルワイドグラデーションバナー（最低200px高さ）、大きなウェルカム見出し（日本語）、タグライン、CTAボタン（日本語）、装飾的なSVG幾何学シェイプを最低2つ含めること。   c. 【ニュースフィード】ちょうど4枚のニュースカード（デスクトップ・モバイル両方で必ず4件固定）。各カードには以下を必ず含めること: サムネイル<img>（上記ルール2に従う）、カテゴリーバッジ（色付き）、タイトル（20文字以上）、本文抜粋（60文字以上、具体的な内容）、著者名、日付、「続きを読む」リンク。カード内に空白エリアを作らないこと。すべて日本語。デスクトップでは2列グリッド（2×2）、モバイルでは1列表示。
-   d. 【クイックリンク】ページ全幅（full-width）のセクション。サイドバーの外側に配置すること。6個のアイコンタイル（SVGアイコン付き）：「人事ポータル」「ITヘルプデスク」「社内規程・ポリシー」「福利厚生」「社員名簿」「社内イベント」。デスクトップでは6列グリッド、モバイルでは3列グリッド。各タイルにはアイコンとラベルを含めること。このセクションはサイドバーと並列ではなく、メインコンテンツの下にfull-widthで配置すること。
-   e. 【サイドバー（デスクトップのみ）〃3つのウィジェットを必ず含めること: (1)「必読コンテンツ」ウィジェット（重要度バッジ付き3件）、(2)「直近のイベント」リスト（3件、日付・タイトル・場所付き）、(3)「お知らせ・アナウンス」ウィジェット（3件、各件に優先度バッジ・タイトル・日付付き）。社内統計やプログレスバーは一切含めないこと。このサイドバーは @media (max-width: 768px) では display:none にすること（モバイルでは非表示）。
-   f. 【ボトムナビゲーション（モバイルのみ）】@media (max-width: 768px) のみで表示。5タブ（ホーム・ニュース・検索・社員・プロフィール）、SVGアイコン付き。CSSは以下を厳守すること:
-      position: fixed; bottom: 0; left: 0; right: 0; width: 100%; box-sizing: border-box; display: flex; flex-direction: row; justify-content: space-around; align-items: center;
-      各タブは flex: 1; text-align: center; にすること。デスクトップでは display:none にすること。
+   b. 【ヒーローセクション】ブランドカラーのフルワイドグラデーションバナー（最低200px高さ）、大きなウェルカム見出し（日本語）、タグライン、CTAボタン（日本語）、装飾的なSVG幾何学シェイプを最低2つ含めること。
+   c. 【ニュースフィード + サイドバー（デスクトップのみ）】デスクトップではメインコンテンツ（ニュース）とサイドバーを横並びにする（例: grid-template-columns: 1fr 300px）。ニュースフィードにはちょうど4枚のニュースカード（デスクトップ・モバイル両方で必ず4件固定）。各カードには以下を必ず含めること: サムネイル<img>（上記ルール2に従う）、カテゴリーバッジ（色付き）、タイトル（20文字以上）、本文抜粋（60文字以上、具体的な内容）、著者名、日付、「続きを読む」リンク。カード内に空白エリアを作らないこと。すべて日本語。デスクトップでは2列グリッド（2×2）、モバイルでは1列表示。サイドバーには3つのウィジェットを必ず含めること: (1)「必読コンテンツ」ウィジェット（重要度バッジ付き3件）、(2)「直近のイベント」リスト（3件、日付・タイトル・場所付き）、(3)「お知らせ・アナウンス」ウィジェット（3件、各件に優先度バッジ・タイトル・日付付き）。社内統計やプログレスバーは一切含めないこと。このサイドバーは @media (max-width: 768px) では display:none にすること（モバイルでは非表示）。
+   d. 【クイックリンク】ニュースフィードセクションの直後・コミュニティセクションの直前に配置すること（セクション順序: ヒーロー → ニュース+サイドバー → クイックリンク → コミュニティ）。ページ全幅（full-width）のセクション。サイドバーの外側・下に配置すること。6個のアイコンタイル（SVGアイコン付き）：「人事ポータル」「ITヘルプデスク」「社内規程・ポリシー」「福利厚生」「社員名簿」「社内イベント」。デスクトップでは6列グリッド、モバイルでは3列グリッド。各タイルにはアイコンとラベルを含めること。このセクションはサイドバーと並列ではなく、メインコンテンツの下にfull-widthで配置すること。
+   e. 【コミュニティセクション（仮置き）】クイックリンクの直後に配置。詳細はルール14を参照。
+   f_sidebar_note. 【サイドバー配置注意】サイドバーはニュースフィードと同じ行（横並び）に配置すること。クイックリンクやコミュニティセクションと同じ行に置かないこと。
+   f. 「ボトムナビゲーション（モバイルのみ）」5タブ（ホーム・ニュース・検索・社員・プロフィール）、SVGアイコン付き。CSSは以下を厳守すること:
+      【重要】.bottom-navのデフォルトCSSは必ず display: flex にすること（display: none は絶対禁止）。
+      position: fixed; bottom: 0; left: 0; right: 0; width: 100%; box-sizing: border-box; display: flex; flex-direction: row; justify-content: space-around; align-items: center; min-height: 56px;
+      各タブは flex: 1; text-align: center; display: flex; flex-direction: column; align-items: center; justify-content: center; にすること。
+      デスクトップでは @media (min-width: 769px) { .bottom-nav { display: none !important; } } で非表示にすること。
+      bottom-nav-innerなどのラッパー要素がある場合も、それも display: flex; flex-direction: row; width: 100%; にすること。
 8. ブランドカラーを一貫して使用：プライマリーはナビ/ヒーロー、セカンダリーはカード/サイドバー、アクセントはCTA/バッジ/ハイライト。
 9. タイポグラフィ：指定フォントファミリーを使用。見出しは太字、本文は通常ウェイト。
 10. 細部へのこだわり：カードのホバー状態（translateY＋シャドウ）、スムーズなトランジション、繊細なグラデーション、プロフェッショナルな余白。

@@ -63,7 +63,11 @@
 - [x] LLM prompt: use industry and brandTone to influence mock style and community group names
 
 ## Round 10
-- [ ] News cards: exactly 4 items on both desktop and mobile (LLM prompt + post-process enforcement)
-- [ ] Quick links section: full-width layout (no sidebar constraint)
-- [ ] Community section: full-width layout (no sidebar constraint)
-- [ ] Mobile bottom nav: fix alignment/overflow so all icons are evenly spaced and not clipped
+- [x] News cards: exactly 4 items on both desktop and mobile (LLM prompt + post-process enforcement)
+- [x] Quick links section: full-width layout (no sidebar constraint)
+- [x] Community section: full-width layout (no sidebar constraint)
+- [x] Mobile bottom nav: fix alignment/overflow so all icons are evenly spaced and not clipped
+
+## Round 11
+- [x] クイックリンクセクションをニュースとコミュニティの間に配置（LLMプロンプトでセクション順序を明示）
+- [x] モバイルボトムナビの崩れを修正（アイコン・テキストの表示崩れ）
