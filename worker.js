@@ -1,47 +1,76 @@
 const MODEL = "@cf/meta/llama-3.1-8b-instruct";
 
-const corsHeaders = {
-  "Access-Control-Allow-Origin": "*",
-  "Access-Control-Allow-Methods": "POST, OPTIONS",
-  "Access-Control-Allow-Headers": "Content-Type, Authorization",
-};
+const ALLOWED_ORIGINS = new Set([
+  "https://staffbase-mock-visualizer.pages.dev",
+]);
 
-function json(data, status = 200) {
+const PREVIEW_ORIGIN_REGEX =
+  /^https:\/\/[a-z0-9-]+\.staffbase-mock-visualizer\.pages\.dev$/i;
+
+function resolveAllowedOrigin(origin) {
+  if (!origin) return "*";
+  if (ALLOWED_ORIGINS.has(origin) || PREVIEW_ORIGIN_REGEX.test(origin)) {
+    return origin;
+  }
+  return "*";
+}
+
+function getCorsHeaders(origin) {
+  return {
+    "Access-Control-Allow-Origin": resolveAllowedOrigin(origin),
+    "Access-Control-Allow-Methods": "POST, OPTIONS",
+    "Access-Control-Allow-Headers":
+      "Content-Type, Authorization, X-Worker-Key",
+    Vary: "Origin",
+  };
+}
+
+function json(data, status = 200, origin = "") {
   return new Response(JSON.stringify(data), {
     status,
     headers: {
       "content-type": "application/json",
-      ...corsHeaders,
+      ...getCorsHeaders(origin),
     },
   });
 }
 
 export default {
   async fetch(request, env) {
+    const requestOrigin = request.headers.get("origin") ?? "";
+
     if (request.method === "OPTIONS") {
-      return new Response(null, { status: 204, headers: corsHeaders });
+      return new Response(null, {
+        status: 200,
+        headers: getCorsHeaders(requestOrigin),
+      });
     }
 
     if (request.method !== "POST") {
-      return json({ error: "Method Not Allowed" }, 405);
+      return json({ error: "Method Not Allowed" }, 405, requestOrigin);
     }
 
     const url = new URL(request.url);
     if (url.pathname !== "/chat/completions") {
-      return json({ error: "Not Found" }, 404);
+      return json({ error: "Not Found" }, 404, requestOrigin);
     }
 
+    const workerKey = request.headers.get("x-worker-key") ?? "";
     const authHeader = request.headers.get("authorization") ?? "";
-    const expected = `Bearer ${env.WORKER_API_KEY ?? ""}`;
-    if (!env.WORKER_API_KEY || authHeader !== expected) {
-      return json({ error: "Unauthorized" }, 401);
+    const expectedBearer = `Bearer ${env.WORKER_API_KEY ?? ""}`;
+    const isAuthorized =
+      !!env.WORKER_API_KEY &&
+      (workerKey === env.WORKER_API_KEY || authHeader === expectedBearer);
+
+    if (!isAuthorized) {
+      return json({ error: "Unauthorized" }, 401, requestOrigin);
     }
 
     let body;
     try {
       body = await request.json();
     } catch {
-      return json({ error: "Invalid JSON body" }, 400);
+      return json({ error: "Invalid JSON body" }, 400, requestOrigin);
     }
 
     const payload = {
@@ -65,14 +94,28 @@ export default {
       }
     );
 
-    const aiData = await aiResponse.json();
+    let aiData;
+    try {
+      aiData = await aiResponse.json();
+    } catch {
+      const errorText = await aiResponse.text();
+      return json(
+        {
+          error: "Workers AI request failed",
+          details: errorText || "Invalid upstream response",
+        },
+        aiResponse.status || 502,
+        requestOrigin
+      );
+    }
     if (!aiResponse.ok || !aiData?.success) {
       return json(
         {
           error: "Workers AI request failed",
           details: aiData?.errors ?? aiData,
         },
-        aiResponse.status || 500
+        aiResponse.status || 500,
+        requestOrigin
       );
     }
 
@@ -103,6 +146,6 @@ export default {
       ],
       usage: result.usage ?? undefined,
       raw: result,
-    });
+    }, 200, requestOrigin);
   },
 };
