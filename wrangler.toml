@@ -1,0 +1,11 @@
+name = "staffbase-mock-visualizer-ai-proxy"
+main = "worker.js"
+compatibility_date = "2026-05-04"
+account_id = "55a5099eed6cfd6796a2ea7324c49a70"
+
+[vars]
+# Set with `wrangler secret put` in production as well.
+CLOUDFLARE_ACCOUNT_ID = "55a5099eed6cfd6796a2ea7324c49a70"
+WORKER_API_KEY = ""
+# CLOUDFLARE_API_TOKEN should be set as a secret:
+# wrangler secret put CLOUDFLARE_API_TOKEN
