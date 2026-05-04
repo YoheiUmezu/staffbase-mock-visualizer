@@ -57,6 +57,48 @@ function extractHtmlDocument(content: string): string {
   return candidate.slice(start).trim();
 }
 
+function ensureInlineCss(html: string, brand: {
+  primaryColor: string;
+  secondaryColor: string;
+  accentColor: string;
+  backgroundColor: string;
+  textColor: string;
+}) {
+  let output = html;
+  // Remove external stylesheet links that can break in generated mock.
+  output = output.replace(/<link[^>]*rel=["']stylesheet["'][^>]*>/gi, "");
+
+  if (/<style[\s\S]*?>[\s\S]*?<\/style>/i.test(output)) {
+    return output;
+  }
+
+  const fallbackStyle = `
+<style>
+  :root {
+    --primary: ${brand.primaryColor};
+    --secondary: ${brand.secondaryColor};
+    --accent: ${brand.accentColor};
+    --bg: ${brand.backgroundColor};
+    --text: ${brand.textColor};
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; background: var(--bg); color: var(--text); }
+  header { background: var(--primary); color: #fff; padding: 16px 24px; }
+  nav ul { margin: 0; padding: 0; list-style: none; display: flex; gap: 16px; }
+  nav a { color: inherit; text-decoration: none; font-weight: 600; }
+  main { padding: 24px; display: grid; gap: 16px; }
+  section { background: #fff; border: 1px solid color-mix(in srgb, var(--secondary) 25%, #fff); border-radius: 12px; padding: 16px; }
+  .cta, button { background: var(--accent); color: #fff; border: none; border-radius: 8px; padding: 8px 12px; }
+</style>`;
+
+  if (/<head[^>]*>/i.test(output)) {
+    output = output.replace(/<head[^>]*>/i, match => `${match}\n${fallbackStyle}`);
+  } else {
+    output = `${fallbackStyle}\n${output}`;
+  }
+  return output;
+}
+
 async function invokeProxyLLM(ctxEnv: {
   CLOUDFLARE_AI_PROXY_URL?: string;
   CLOUDFLARE_AI_PROXY_KEY?: string;
@@ -190,7 +232,8 @@ Page content summary: ${(markdown || "not available").slice(0, 2000)}
 Fallback brand colors: ${input.brandData.primaryColor}, ${input.brandData.secondaryColor}, ${input.brandData.accentColor}
 
 Use real extracted colors whenever available.
-Return only raw HTML starting with <!DOCTYPE html> or <html>.`;
+Return only raw HTML starting with <!DOCTYPE html> or <html>.
+Do NOT reference external CSS files. You MUST include all CSS in a <style> tag inside <head>.`;
 
       const { extractedContent } = await invokeProxyLLM(ctx.env, [
         {
@@ -206,7 +249,8 @@ Return only raw HTML starting with <!DOCTYPE html> or <html>.`;
         throw new Error("LLM returned invalid HTML");
       }
 
-      return { html: cleaned };
+      const styled = ensureInlineCss(cleaned, input.brandData);
+      return { html: styled };
     }),
 
   generateImagePrompt: publicProcedure
