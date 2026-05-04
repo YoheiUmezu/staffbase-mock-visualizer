@@ -28,6 +28,34 @@ const mockGenerationSchema = z.object({
 
 type Message = { role: "system" | "user" | "assistant"; content: string };
 
+type LlmProxyResponse = {
+  choices?: Array<{ message?: { content?: unknown } }>;
+  raw?: unknown;
+};
+
+function extractJsonObjectText(content: string): string {
+  const trimmed = content.trim();
+  const fenced = trimmed.match(/```(?:json)?\s*([\s\S]*?)```/i);
+  const candidate = fenced?.[1]?.trim() ?? trimmed;
+  const start = candidate.indexOf("{");
+  const end = candidate.lastIndexOf("}");
+  if (start >= 0 && end > start) return candidate.slice(start, end + 1);
+  return candidate;
+}
+
+function extractHtmlDocument(content: string): string {
+  const trimmed = content.trim();
+  const fenced = trimmed.match(/```(?:html)?\s*([\s\S]*?)```/i);
+  const candidate = fenced?.[1]?.trim() ?? trimmed;
+  const lower = candidate.toLowerCase();
+  const doctypeIdx = lower.indexOf("<!doctype");
+  const htmlIdx = lower.indexOf("<html");
+  const start =
+    doctypeIdx >= 0 ? doctypeIdx : htmlIdx >= 0 ? htmlIdx : -1;
+  if (start < 0) return "";
+  return candidate.slice(start).trim();
+}
+
 async function invokeProxyLLM(ctxEnv: {
   CLOUDFLARE_AI_PROXY_URL?: string;
   CLOUDFLARE_AI_PROXY_KEY?: string;
@@ -47,7 +75,7 @@ async function invokeProxyLLM(ctxEnv: {
     body: JSON.stringify({
       model: "@cf/meta/llama-3.1-8b-instruct",
       messages,
-      max_tokens: 2048,
+      max_tokens: 4096,
     }),
   });
 
@@ -56,10 +84,14 @@ async function invokeProxyLLM(ctxEnv: {
     throw new Error(`LLM invoke failed: ${response.status} ${response.statusText} - ${text}`);
   }
 
-  const parsed = JSON.parse(text) as {
-    choices?: Array<{ message?: { content?: string } }>;
-  };
-  return parsed.choices?.[0]?.message?.content ?? "";
+  const parsed = JSON.parse(text) as LlmProxyResponse;
+  const extractedContent = String(parsed.choices?.[0]?.message?.content ?? "");
+
+  // Temporary production debug logs for response-shape investigation.
+  console.log("LLM raw response:", JSON.stringify(parsed));
+  console.log("Extracted content:", extractedContent);
+
+  return { llmResponse: parsed, extractedContent };
 }
 
 export const mockRouter = router({
@@ -70,7 +102,7 @@ export const mockRouter = router({
 primaryColor, secondaryColor, accentColor, backgroundColor, textColor, fontStyle, logoText, industry, brandTone, tagline.
 Use hex colors where applicable. Return JSON only.`;
 
-      const content = await invokeProxyLLM(ctx.env, [
+      const { extractedContent } = await invokeProxyLLM(ctx.env, [
         {
           role: "system",
           content:
@@ -79,7 +111,7 @@ Use hex colors where applicable. Return JSON only.`;
         { role: "user", content: prompt },
       ]);
 
-      const parsed = JSON.parse(content || "{}");
+      const parsed = JSON.parse(extractJsonObjectText(extractedContent || "{}"));
       if (input.industry) parsed.industry = input.industry;
       if (input.brandTone) parsed.brandTone = input.brandTone;
       return brandDataSchema.parse(parsed);
@@ -92,7 +124,7 @@ Use hex colors where applicable. Return JSON only.`;
 Use brand colors: ${input.brandData.primaryColor}, ${input.brandData.secondaryColor}, ${input.brandData.accentColor}.
 Return only raw HTML starting with <!DOCTYPE html>.`;
 
-      const html = await invokeProxyLLM(ctx.env, [
+      const { extractedContent } = await invokeProxyLLM(ctx.env, [
         {
           role: "system",
           content:
@@ -101,8 +133,8 @@ Return only raw HTML starting with <!DOCTYPE html>.`;
         { role: "user", content: prompt },
       ]);
 
-      const cleaned = html.trim();
-      if (!cleaned.toLowerCase().startsWith("<!doctype") && !cleaned.toLowerCase().startsWith("<html")) {
+      const cleaned = extractHtmlDocument(extractedContent);
+      if (!cleaned) {
         throw new Error("LLM returned invalid HTML");
       }
 
@@ -121,7 +153,7 @@ Return only raw HTML starting with <!DOCTYPE html>.`;
       const prompt = `Create a Japanese Stable Diffusion prompt for ${input.companyName}'s intranet hero image.
 Include sections ①レイアウト ②ブランド ③ビジュアル ④品質 in Japanese.`;
 
-      const content = await invokeProxyLLM(ctx.env, [
+      const { extractedContent } = await invokeProxyLLM(ctx.env, [
         {
           role: "system",
           content:
@@ -130,7 +162,7 @@ Include sections ①レイアウト ②ブランド ③ビジュアル ④品質
         { role: "user", content: prompt },
       ]);
 
-      if (!content) throw new Error("No response from LLM");
-      return { prompt: content.trim() };
+      if (!extractedContent) throw new Error("No response from LLM");
+      return { prompt: extractedContent.trim() };
     }),
 });

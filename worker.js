@@ -76,7 +76,7 @@ export default {
     const payload = {
       model: MODEL,
       messages: body.messages ?? [],
-      max_tokens: body.max_tokens ?? 2048,
+      max_tokens: body.max_tokens ?? 4096,
       ...(body.response_format ? { response_format: body.response_format } : {}),
       ...(body.tools ? { tools: body.tools } : {}),
       ...(body.tool_choice ? { tool_choice: body.tool_choice } : {}),
