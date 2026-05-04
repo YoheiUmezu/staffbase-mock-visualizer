@@ -4,6 +4,8 @@ import { inferAsyncReturnType } from "@trpc/server";
 type EnvShape = {
   CLOUDFLARE_AI_PROXY_URL?: string;
   CLOUDFLARE_AI_PROXY_KEY?: string;
+  CLOUDFLARE_ACCOUNT_ID?: string;
+  CLOUDFLARE_API_TOKEN?: string;
 };
 
 export function createContext({

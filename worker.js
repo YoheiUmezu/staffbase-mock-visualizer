@@ -1,4 +1,5 @@
-const MODEL = "@cf/meta/llama-3.1-8b-instruct";
+const PRIMARY_MODEL = "@cf/meta/llama-3.3-70b-instruct-fp8-fast";
+const FALLBACK_MODEL = "@cf/meta/llama-3.1-8b-instruct";
 
 const ALLOWED_ORIGINS = new Set([
   "https://staffbase-mock-visualizer.pages.dev",
@@ -74,7 +75,7 @@ export default {
     }
 
     const payload = {
-      model: MODEL,
+      model: PRIMARY_MODEL,
       messages: body.messages ?? [],
       max_tokens: body.max_tokens ?? 4096,
       ...(body.response_format ? { response_format: body.response_format } : {}),
@@ -82,44 +83,61 @@ export default {
       ...(body.tool_choice ? { tool_choice: body.tool_choice } : {}),
     };
 
-    const aiResponse = await fetch(
-      `https://api.cloudflare.com/client/v4/accounts/${env.CLOUDFLARE_ACCOUNT_ID}/ai/run/${MODEL}`,
-      {
-        method: "POST",
-        headers: {
-          Authorization: `Bearer ${env.CLOUDFLARE_API_TOKEN}`,
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify(payload),
+    async function runModel(model) {
+      const aiResponse = await fetch(
+        `https://api.cloudflare.com/client/v4/accounts/${env.CLOUDFLARE_ACCOUNT_ID}/ai/run/${model}`,
+        {
+          method: "POST",
+          headers: {
+            Authorization: `Bearer ${env.CLOUDFLARE_API_TOKEN}`,
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({ ...payload, model }),
+        }
+      );
+
+      let aiData;
+      try {
+        aiData = await aiResponse.json();
+      } catch {
+        const errorText = await aiResponse.text();
+        return {
+          ok: false,
+          status: aiResponse.status || 502,
+          data: { error: "Workers AI request failed", details: errorText || "Invalid upstream response" },
+          model,
+        };
       }
-    );
 
-    let aiData;
-    try {
-      aiData = await aiResponse.json();
-    } catch {
-      const errorText = await aiResponse.text();
-      return json(
-        {
-          error: "Workers AI request failed",
-          details: errorText || "Invalid upstream response",
-        },
-        aiResponse.status || 502,
-        requestOrigin
-      );
-    }
-    if (!aiResponse.ok || !aiData?.success) {
-      return json(
-        {
-          error: "Workers AI request failed",
-          details: aiData?.errors ?? aiData,
-        },
-        aiResponse.status || 500,
-        requestOrigin
-      );
+      if (!aiResponse.ok || !aiData?.success) {
+        return {
+          ok: false,
+          status: aiResponse.status || 500,
+          data: { error: "Workers AI request failed", details: aiData?.errors ?? aiData },
+          model,
+        };
+      }
+
+      return { ok: true, status: 200, data: aiData, model };
     }
 
-    const result = aiData.result ?? {};
+    let run = await runModel(PRIMARY_MODEL);
+    if (!run.ok) {
+      const details = run.data?.details;
+      const detailsText = Array.isArray(details)
+        ? JSON.stringify(details)
+        : String(details ?? "");
+      const modelMissing = run.status === 404 || detailsText.includes("does not exist");
+      if (modelMissing) {
+        run = await runModel(FALLBACK_MODEL);
+      }
+    }
+
+    if (!run.ok) {
+      return json(run.data, run.status, requestOrigin);
+    }
+
+    const result = run.data.result ?? {};
     const text = (() => {
       if (typeof result.response === "string") return result.response;
       if (typeof result.output_text === "string") return result.output_text;
@@ -133,7 +151,7 @@ export default {
     return json({
       id: crypto.randomUUID(),
       created: Math.floor(Date.now() / 1000),
-      model: MODEL,
+      model: run.model,
       choices: [
         {
           index: 0,

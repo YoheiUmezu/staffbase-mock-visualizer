@@ -23,6 +23,7 @@ const brandDataSchema = z.object({
 
 const mockGenerationSchema = z.object({
   companyName: z.string(),
+  websiteUrl: z.string().url(),
   brandData: brandDataSchema,
 });
 
@@ -73,7 +74,7 @@ async function invokeProxyLLM(ctxEnv: {
       "x-worker-key": key,
     },
     body: JSON.stringify({
-      model: "@cf/meta/llama-3.1-8b-instruct",
+      model: "@cf/meta/llama-3.3-70b-instruct-fp8-fast",
       messages,
       max_tokens: 4096,
     }),
@@ -92,6 +93,61 @@ async function invokeProxyLLM(ctxEnv: {
   console.log("Extracted content:", extractedContent);
 
   return { llmResponse: parsed, extractedContent };
+}
+
+async function extractBrandFromUrl(
+  url: string,
+  env: {
+    CLOUDFLARE_ACCOUNT_ID?: string;
+    CLOUDFLARE_API_TOKEN?: string;
+  }
+) {
+  if (!env.CLOUDFLARE_ACCOUNT_ID || !env.CLOUDFLARE_API_TOKEN) return "";
+
+  const response = await fetch(
+    `https://api.cloudflare.com/client/v4/accounts/${env.CLOUDFLARE_ACCOUNT_ID}/browser-rendering/markdown`,
+    {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${env.CLOUDFLARE_API_TOKEN}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({ url }),
+    }
+  );
+
+  if (!response.ok) return "";
+  const data = (await response.json()) as { result?: { markdown?: string } };
+  return data.result?.markdown ?? "";
+}
+
+async function extractCSSColors(
+  url: string,
+  env: {
+    CLOUDFLARE_ACCOUNT_ID?: string;
+    CLOUDFLARE_API_TOKEN?: string;
+  }
+) {
+  if (!env.CLOUDFLARE_ACCOUNT_ID || !env.CLOUDFLARE_API_TOKEN) return [] as string[];
+
+  const response = await fetch(
+    `https://api.cloudflare.com/client/v4/accounts/${env.CLOUDFLARE_ACCOUNT_ID}/browser-rendering/content`,
+    {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${env.CLOUDFLARE_API_TOKEN}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({ url }),
+    }
+  );
+
+  if (!response.ok) return [] as string[];
+  const data = (await response.json()) as { result?: { content?: string } };
+  const html = data.result?.content ?? "";
+  const colorMatches =
+    html.match(/#([0-9A-Fa-f]{6}|[0-9A-Fa-f]{3})\b|rgb\(\d+,\s*\d+,\s*\d+\)/g) ?? [];
+  return [...new Set(colorMatches)].slice(0, 10);
 }
 
 export const mockRouter = router({
@@ -120,9 +176,21 @@ Use hex colors where applicable. Return JSON only.`;
   generateMock: publicProcedure
     .input(mockGenerationSchema)
     .mutation(async ({ input, ctx }) => {
-      const prompt = `Create a complete standalone HTML intranet page for ${input.companyName}.
-Use brand colors: ${input.brandData.primaryColor}, ${input.brandData.secondaryColor}, ${input.brandData.accentColor}.
-Return only raw HTML starting with <!DOCTYPE html>.`;
+      const [markdown, colors] = await Promise.all([
+        extractBrandFromUrl(input.websiteUrl, ctx.env),
+        extractCSSColors(input.websiteUrl, ctx.env),
+      ]);
+
+      const prompt = `You are a brand design specialist.
+Generate a complete standalone HTML intranet mockup for ${input.companyName}.
+
+Actual page colors: ${colors.join(", ") || "not available"}
+Page content summary: ${(markdown || "not available").slice(0, 2000)}
+
+Fallback brand colors: ${input.brandData.primaryColor}, ${input.brandData.secondaryColor}, ${input.brandData.accentColor}
+
+Use real extracted colors whenever available.
+Return only raw HTML starting with <!DOCTYPE html> or <html>.`;
 
       const { extractedContent } = await invokeProxyLLM(ctx.env, [
         {

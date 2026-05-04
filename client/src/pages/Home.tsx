@@ -439,7 +439,11 @@ export default function Home() {
       });
       setBrandData(brand);
       setStep("generating");
-      const result = await generateMock.mutateAsync({ companyName: name, brandData: brand });
+      const result = await generateMock.mutateAsync({
+        companyName: name,
+        websiteUrl: url,
+        brandData: brand,
+      });
       setMockHtml(result.html);
       setStep("done");
       // Auto-generate AI image prompt in background
