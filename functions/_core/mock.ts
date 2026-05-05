@@ -268,7 +268,7 @@ async function extractCSSColors(
 
   const colorMatches =
     html.match(/#([0-9A-Fa-f]{6}|[0-9A-Fa-f]{3})\b|rgb\(\d+,\s*\d+,\s*\d+\)/g) ?? [];
-  const unique = [...new Set(colorMatches)].slice(0, 10);
+  const unique = Array.from(new Set(colorMatches)).slice(0, 10);
   console.log("[extractCSSColors] parsed colors:", unique);
   return unique;
 }
