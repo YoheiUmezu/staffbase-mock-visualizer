@@ -161,7 +161,12 @@ async function extractBrandFromUrl(
     CLOUDFLARE_API_TOKEN?: string;
   }
 ) {
-  if (!env.CLOUDFLARE_ACCOUNT_ID || !env.CLOUDFLARE_API_TOKEN) return "";
+  if (!env.CLOUDFLARE_ACCOUNT_ID || !env.CLOUDFLARE_API_TOKEN) {
+    console.log(
+      "[extractBrandFromUrl] skip: missing CLOUDFLARE_ACCOUNT_ID or CLOUDFLARE_API_TOKEN"
+    );
+    return "";
+  }
 
   const response = await fetch(
     `https://api.cloudflare.com/client/v4/accounts/${env.CLOUDFLARE_ACCOUNT_ID}/browser-rendering/markdown`,
@@ -175,8 +180,34 @@ async function extractBrandFromUrl(
     }
   );
 
-  if (!response.ok) return "";
-  const data = (await response.json()) as { result?: { markdown?: string } };
+  const responseText = await response.text();
+  console.log(`[extractBrandFromUrl] status=${response.status} url=${url}`);
+
+  if (!response.ok) {
+    console.log(
+      "[extractBrandFromUrl] error body (trimmed):",
+      responseText.slice(0, 2000)
+    );
+    return "";
+  }
+
+  let data: { success?: boolean; errors?: unknown; result?: { markdown?: string } };
+  try {
+    data = JSON.parse(responseText);
+  } catch (e) {
+    console.log("[extractBrandFromUrl] JSON parse error:", e);
+    return "";
+  }
+
+  console.log(
+    "[extractBrandFromUrl] API response summary:",
+    JSON.stringify({
+      success: data.success,
+      errors: data.errors,
+      markdownLength: data.result?.markdown?.length ?? 0,
+    })
+  );
+
   return data.result?.markdown ?? "";
 }
 
@@ -187,7 +218,12 @@ async function extractCSSColors(
     CLOUDFLARE_API_TOKEN?: string;
   }
 ) {
-  if (!env.CLOUDFLARE_ACCOUNT_ID || !env.CLOUDFLARE_API_TOKEN) return [] as string[];
+  if (!env.CLOUDFLARE_ACCOUNT_ID || !env.CLOUDFLARE_API_TOKEN) {
+    console.log(
+      "[extractCSSColors] skip: missing CLOUDFLARE_ACCOUNT_ID or CLOUDFLARE_API_TOKEN"
+    );
+    return [] as string[];
+  }
 
   const response = await fetch(
     `https://api.cloudflare.com/client/v4/accounts/${env.CLOUDFLARE_ACCOUNT_ID}/browser-rendering/content`,
@@ -201,12 +237,55 @@ async function extractCSSColors(
     }
   );
 
-  if (!response.ok) return [] as string[];
-  const data = (await response.json()) as { result?: { content?: string } };
+  const responseText = await response.text();
+  console.log(`[extractCSSColors] status=${response.status} url=${url}`);
+
+  if (!response.ok) {
+    console.log(
+      "[extractCSSColors] error body (trimmed):",
+      responseText.slice(0, 2000)
+    );
+    return [] as string[];
+  }
+
+  let data: { success?: boolean; errors?: unknown; result?: { content?: string } };
+  try {
+    data = JSON.parse(responseText);
+  } catch (e) {
+    console.log("[extractCSSColors] JSON parse error:", e);
+    return [] as string[];
+  }
+
   const html = data.result?.content ?? "";
+  console.log(
+    "[extractCSSColors] API response summary:",
+    JSON.stringify({
+      success: data.success,
+      errors: data.errors,
+      contentLength: html.length,
+    })
+  );
+
   const colorMatches =
     html.match(/#([0-9A-Fa-f]{6}|[0-9A-Fa-f]{3})\b|rgb\(\d+,\s*\d+,\s*\d+\)/g) ?? [];
-  return [...new Set(colorMatches)].slice(0, 10);
+  const unique = [...new Set(colorMatches)].slice(0, 10);
+  console.log("[extractCSSColors] parsed colors:", unique);
+  return unique;
+}
+
+/** When Browser Rendering returns no hex/rgb, fall back to brand extraction colors for prompts. */
+function colorsForPrompt(
+  extracted: string[],
+  brand: z.infer<typeof brandDataSchema>
+): string[] {
+  if (extracted.length > 0) return extracted;
+  return [
+    brand.primaryColor,
+    brand.secondaryColor,
+    brand.accentColor,
+    brand.backgroundColor,
+    brand.textColor,
+  ].filter((c) => typeof c === "string" && c.length > 0);
 }
 
 export const mockRouter = router({
@@ -235,10 +314,22 @@ Use hex colors where applicable. Return JSON only.`;
   generateMock: publicProcedure
     .input(mockGenerationSchema)
     .mutation(async ({ input, ctx }) => {
+      const url = input.websiteUrl;
       const [markdown, colors] = await Promise.all([
-        extractBrandFromUrl(input.websiteUrl, ctx.env),
-        extractCSSColors(input.websiteUrl, ctx.env),
+        extractBrandFromUrl(url, ctx.env),
+        extractCSSColors(url, ctx.env),
       ]);
+
+      console.log("取得したカラー:", colors);
+      console.log("取得したMarkdown長:", markdown.length);
+
+      const promptColors = colorsForPrompt(colors, input.brandData);
+      if (colors.length === 0 && promptColors.length > 0) {
+        console.log(
+          "[generateMock] 抽出カラーが空のため brandData をプロンプト用に使用:",
+          promptColors
+        );
+      }
 
       const { extractedContent } = await invokeProxyLLM(ctx.env, [
         {
@@ -249,50 +340,41 @@ Use hex colors where applicable. Return JSON only.`;
             "以下のブランド情報を元に、SKILL.mdとテンプレートの" +
             "指示に従って高品質なStaffbase UIモックアップHTMLを" +
             "生成してください。\n" +
-            `実際のページカラー：${colors.join(", ")}\n` +
+            `実際のページカラー（抽出またはフォールバック）：${promptColors.join(", ")}\n` +
             `ページコンテンツ：${markdown.slice(0, 2000)}`,
         },
         {
           role: "user",
           content: `
-以下の条件で完全なHTMLファイルを生成してください。
+URL：${url}
+取得したブランドカラー：${colors.length > 0 ? colors.join(", ") : "未取得（URLから推測してください）"}
 
-URL：${input.websiteUrl}
-ブランドカラー：${colors.join(", ")}
+## 必須の出力要件
+以下のセクションをすべて含む完全なHTMLを生成してください：
 
-## 絶対に守るルール
-1. 必ず<!DOCTYPE html>から始めること
-2. CSSは必ず<head>内の<style>タグに記述すること
-3. CSSをHTMLの外や本文中に書かないこと
-4. 以下の形式を厳守すること：
+1. ヘッダー（ロゴ・ナビゲーションメニュー5項目）
+2. ヒーローセクション（大きな見出し・サブテキスト・CTAボタン）
+3. 特徴セクション（3カラムのカード）
+4. コンテンツセクション（画像プレースホルダー＋テキスト）
+5. フッター（リンク・コピーライト）
 
-<!DOCTYPE html>
-<html lang="ja">
-<head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>ブランド名 Staffbase UI</title>
-  <style>
-    /* ここにCSSを書く */
-    :root {
-      --color-primary: #000000;
-    }
-    body { ... }
-    .header { ... }
-  </style>
-</head>
-<body>
-  <!-- ここにHTMLを書く -->
-  <header class="header">...</header>
-  <main>...</main>
-  <footer>...</footer>
-</body>
-</html>
+## カラー指定
+- プライマリカラー：取得カラーの中で最も目立つ色を使用
+- ヘッダー・CTAボタン・アクセントにプライマリカラーを使用
+- 背景は白またはライトグレー
 
-5. この形式以外での出力は禁止
-6. コードブロック(\`\`\`html)で囲まないこと
-7. 説明文を含めないこと
-8. HTMLのみを出力すること
+## Staffbase UI要件
+- Staffbaseのナビゲーション構造に準拠
+- モバイルはハンバーガーメニュー表示
+- フォントはsans-serif
+- カードには影（box-shadow）を付ける
+
+必ず上記5セクションをすべて含めてください。
+
+## HTML構造（厳守）
+1. 必ず<!DOCTYPE html>から始める
+2. すべてのCSSは<head>内の<style>のみ。本文中やタグ外にCSSを書かない
+3. コードブロック(\`\`\`html)で囲まない。説明文を付けない。HTMLのみを出力
 `,
         },
       ]);
