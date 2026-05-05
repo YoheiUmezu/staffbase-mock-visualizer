@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { systemContext } from "./docs-loader";
 import { publicProcedure, router } from "./router";
 
 const brandExtractionSchema = z.object({
@@ -118,7 +119,7 @@ async function invokeProxyLLM(ctxEnv: {
     body: JSON.stringify({
       model: "@cf/meta/llama-3.3-70b-instruct-fp8-fast",
       messages,
-      max_tokens: 4096,
+      max_tokens: 8192,
     }),
   });
 
@@ -223,25 +224,26 @@ Use hex colors where applicable. Return JSON only.`;
         extractCSSColors(input.websiteUrl, ctx.env),
       ]);
 
-      const prompt = `You are a brand design specialist.
-Generate a complete standalone HTML intranet mockup for ${input.companyName}.
-
-Actual page colors: ${colors.join(", ") || "not available"}
-Page content summary: ${(markdown || "not available").slice(0, 2000)}
-
-Fallback brand colors: ${input.brandData.primaryColor}, ${input.brandData.secondaryColor}, ${input.brandData.accentColor}
-
-Use real extracted colors whenever available.
-Return only raw HTML starting with <!DOCTYPE html> or <html>.
-Do NOT reference external CSS files. You MUST include all CSS in a <style> tag inside <head>.`;
-
       const { extractedContent } = await invokeProxyLLM(ctx.env, [
         {
           role: "system",
           content:
-            "You are a UI engineer. Return only production-ready raw HTML. No markdown fences.",
+            systemContext +
+            "\n\n## 今回のタスク\n" +
+            "以下のブランド情報を元に、SKILL.mdとテンプレートの" +
+            "指示に従って高品質なStaffbase UIモックアップHTMLを" +
+            "生成してください。\n" +
+            `実際のページカラー：${colors.join(", ")}\n` +
+            `ページコンテンツ：${markdown.slice(0, 2000)}`,
         },
-        { role: "user", content: prompt },
+        {
+          role: "user",
+          content:
+            `企業名: ${input.companyName}\n` +
+            `フォールバックのブランドカラー: ${input.brandData.primaryColor}, ${input.brandData.secondaryColor}, ${input.brandData.accentColor}\n` +
+            "抽出されたページカラーを優先し、<!DOCTYPE html> または <html> で始まる生のHTMLのみを返してください。マークダウンのコードフェンスは使わないでください。\n" +
+            "外部CSSは参照せず、<head>内の<style>にすべてのCSSを含めてください。",
+        },
       ]);
 
       const cleaned = extractHtmlDocument(extractedContent);

@@ -1,0 +1,114 @@
+/* =========================================================
+   Northstar Manufacturing — Staffbase Custom CSS Proposal
+   Purpose:
+   - Example refinement layer to complement standard Branding settings
+   - Based only on publicly documented/tutorial-supported selector patterns
+   - Validate visually after applying
+   ========================================================= */
+
+/* ---------------------------------------------------------
+   1) Mobile bottom navigation refinement
+   Public tutorial pattern:
+   #toolbar .toolbar-item
+   #toolbar .toolbar-item.selected
+   --------------------------------------------------------- */
+
+   .mobile #toolbar .toolbar-item,
+   .native #toolbar .toolbar-item {
+     background-color: #0B1F33;
+     color: #F7FAFC;
+   }
+   
+   .mobile #toolbar .toolbar-item .toolbar-item-title,
+   .native #toolbar .toolbar-item .toolbar-item-title {
+     font-weight: 600;
+     letter-spacing: 0.02em;
+   }
+   
+   .mobile #toolbar .toolbar-item.selected,
+   .native #toolbar .toolbar-item.selected {
+     background-color: #005BBB;
+     color: #FFFFFF;
+     font-weight: 700;
+   }
+   
+   /* ---------------------------------------------------------
+      2) Badge refinement
+      Public tutorial pattern:
+      .news-feed-post-badge.type-highlighted
+      .news-feed-post-badge.type-acknowledged
+      .news-feed-post-badges .news-feed-post-badge
+      --------------------------------------------------------- */
+   
+   .news-feed-post-badge.type-highlighted {
+     background: #00A6A6 !important;
+     color: #FFFFFF !important;
+   }
+   
+   .news-feed-post-badge.type-acknowledged {
+     background: #005BBB !important;
+     color: #FFFFFF !important;
+   }
+   
+   .news-feed-post-badges .news-feed-post-badge {
+     border-radius: 999px;
+     font-size: 12px;
+     font-weight: 700;
+     line-height: 16px;
+     padding: 4px 10px 3px 10px;
+   }
+   
+   /* ---------------------------------------------------------
+      3) Example localized page polish
+      Use localized targeting for specific pages/plugins when needed
+      Validate actual object/page ID before applying
+      This is intentionally an example pattern, not a verified ID
+      --------------------------------------------------------- */
+   
+   /*
+   .page.plugin-REPLACE_WITH_REAL_ID .page-content {
+     border-radius: 16px;
+     background: #FFFFFF;
+   }
+   */
+   
+   /* ---------------------------------------------------------
+      4) User profile widget refinement example
+      Public tutorial pattern:
+      user-profile-block .user-profile-summary-defaults
+      user-profile-block .user-profile-summary::before
+      Keep only if the business use case requires it
+      --------------------------------------------------------- */
+   
+   /*
+   user-profile-block .user-profile-summary-defaults {
+     display: none;
+   }
+   
+   user-profile-block .user-profile-summary::before {
+     content: attr(data-field-phoneNumber) "  ";
+     color: #16202A;
+     font-weight: 600;
+   }
+   */
+   
+   /* ---------------------------------------------------------
+      5) Optional desktop/browser header nuance
+      Scope by documented root classes where appropriate
+      Example only — validate target element before use
+      --------------------------------------------------------- */
+   
+   /*
+   .desktop.browser .some-validated-header-selector {
+     box-shadow: 0 8px 24px rgba(11, 31, 51, 0.08);
+   }
+   */
+   
+   /* ---------------------------------------------------------
+      Validation Reminder
+      - Check desktop
+      - Check mobile
+      - Confirm no unintended global impact
+      - Reconfirm contrast and active states
+      --------------------------------------------------------- */
+   
