@@ -58,6 +58,22 @@ function extractHtmlDocument(content: string): string {
   return candidate.slice(start).trim();
 }
 
+/** Reject HTML when there is no stylesheet source inside <head> (avoids raw CSS leaked into body). */
+function assertHeadContainsCss(html: string) {
+  const lower = html.toLowerCase();
+  const headOpen = lower.indexOf("<head");
+  const headClose = lower.indexOf("</head>");
+  if (headOpen === -1 || headClose === -1 || headClose <= headOpen) {
+    throw new Error("CSS not found in HTML");
+  }
+  const headHtml = html.slice(headOpen, headClose);
+  const hasStyle = /<style[\s>]/i.test(headHtml);
+  const hasLink = /<link[^>]*rel\s*=\s*["']?stylesheet["']?/i.test(headHtml);
+  if (!hasStyle && !hasLink) {
+    throw new Error("CSS not found in HTML");
+  }
+}
+
 function ensureInlineCss(html: string, brand: {
   primaryColor: string;
   secondaryColor: string;
@@ -238,11 +254,46 @@ Use hex colors where applicable. Return JSON only.`;
         },
         {
           role: "user",
-          content:
-            `企業名: ${input.companyName}\n` +
-            `フォールバックのブランドカラー: ${input.brandData.primaryColor}, ${input.brandData.secondaryColor}, ${input.brandData.accentColor}\n` +
-            "抽出されたページカラーを優先し、<!DOCTYPE html> または <html> で始まる生のHTMLのみを返してください。マークダウンのコードフェンスは使わないでください。\n" +
-            "外部CSSは参照せず、<head>内の<style>にすべてのCSSを含めてください。",
+          content: `
+以下の条件で完全なHTMLファイルを生成してください。
+
+URL：${input.websiteUrl}
+ブランドカラー：${colors.join(", ")}
+
+## 絶対に守るルール
+1. 必ず<!DOCTYPE html>から始めること
+2. CSSは必ず<head>内の<style>タグに記述すること
+3. CSSをHTMLの外や本文中に書かないこと
+4. 以下の形式を厳守すること：
+
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>ブランド名 Staffbase UI</title>
+  <style>
+    /* ここにCSSを書く */
+    :root {
+      --color-primary: #000000;
+    }
+    body { ... }
+    .header { ... }
+  </style>
+</head>
+<body>
+  <!-- ここにHTMLを書く -->
+  <header class="header">...</header>
+  <main>...</main>
+  <footer>...</footer>
+</body>
+</html>
+
+5. この形式以外での出力は禁止
+6. コードブロック(\`\`\`html)で囲まないこと
+7. 説明文を含めないこと
+8. HTMLのみを出力すること
+`,
         },
       ]);
 
@@ -250,6 +301,8 @@ Use hex colors where applicable. Return JSON only.`;
       if (!cleaned) {
         throw new Error("LLM returned invalid HTML");
       }
+
+      assertHeadContainsCss(cleaned);
 
       const styled = ensureInlineCss(cleaned, input.brandData);
       return { html: styled };
